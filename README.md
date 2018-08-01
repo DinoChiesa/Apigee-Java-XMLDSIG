@@ -31,7 +31,6 @@ Make sure these JARs are available as resources in the  proxy or in the environm
 
 * Bouncy Castle: bcprov-jdk15on-1.50.jar, bcpkix-jdk15on-1.50.jar
 * commons-lang3-3.7.jar
-* commons-codec-1.6.jar
 
 
 ## Usage
