@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><order>
+  <customer customerNumber="0815A4711">
+    <name>Michael Sonntag</name>
+    <address>
+      <street>Altenbergerstr. 69</street>
+      <ZIP>4040</ZIP>
+      <city>Linz</city>
+    </address>
+  </customer>
+  <articles>
+    <line>
+      <quantity unit="piece">30</quantity>
+      <product productNumber="9907">XML editing widget</product>
+      <price currency="EUR">0.10</price>
+    </line>
+    <line>
+      <quantity unit="litre">5</quantity>
+      <product productNumber="007">Super juice</product>
+      <price currency="HUF">500</price>
+    </line>
+  </articles>
+  <delivery>
+    <deliveryaddress>
+      <name>Michael Sonntag</name>
+      <address>
+        <street>Auf der Wies 18</street>
+      </address>
+    </deliveryaddress>
+  </delivery>
+  <payment type="CC">
+    <creditcard issuer="Mastercard">
+      <nameOnCard>Mag. Dipl.-Ing. Dr. Michael Sonntag</nameOnCard>
+      <number>5201 2345 6789 0123</number>
+      <expiryDate>2006-04-30</expiryDate>
+    </creditcard>
+  </payment>
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></Transforms><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>Rtv+iAkC0p7hJbs3741vK/V7eV92EuEk+hb6IUXVhME=</DigestValue></Reference></SignedInfo><SignatureValue>w9Fqn9Dx22xh++HgU4YeyZ0ndYcWj17IHrV2eZ17dj2U5o3de2IAmvg2jdLJxs99GLstOonhv/cK
+b7mzpI6tGyUTfGwhS5l1Ok8DFooxDT7KvJ6RXBuWFuuNYa+iN+fLbxBOg5D8gAOVC1qsOCas7bs8
+CSkzVWRZRxl6JJuaOpyJ6xM3nIdkSAqGYnChljQuGI6UXgru/KKc4mASCjkyzknzoJa4fv9C2enY
+9E7LZ4z+KqdtyK5xjifLXxfIIDAF+9hQUzIe+Wm4otZ0p7pQX6LEYVifkLoJbaLdsw8KTHYcF+XS
+8d6qUENo/WnHp0dCLxzFZISnumCAt6DHHah3/A==</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>B6PenDyGOg0P5vb5DfJ13DmjJi82KdPT58LjZlG6LYD27IFCh1yO+4ygJAxfIB00muiIuB8YyQ3T
+JKgkJdEWcVTGL1aomN0PuHTHP67FfBPHgmCM1+wEtm6tn+uoxyvQhLkB1/4Ke0VA7wJx4LB5Nxoo
+/4GCYZp+m/1DAqTvDy99hRuSTWt+VJacgPvfDMA2akFJAwUVSJwh/SyFZf2yqonzfnkHEK/hnC81
+vACs6usAj4wR04yj5yElXW+pQ5Vk4RUwR6Q0E8nKWLfYFrXygeYUbTSQEj0f44DGVHOdMdT+BoGV
+5SJ1ITs+peOCYjhVZvdngyCP9YNDtsLZftMLoQ==</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue></KeyInfo></Signature></order>
