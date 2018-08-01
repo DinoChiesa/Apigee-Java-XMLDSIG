@@ -22,8 +22,20 @@ This code is open source but you don't need to compile it in order to use it.
 
 There are two callout classes,
 
-* com.google.apigee.edgecallouts.xmldsig.Sign - signs the input document
+* com.google.apigee.edgecallouts.xmldsig.Sign - signs the input document.
 * com.google.apigee.edgecallouts.xmldsig.Validate - validates the signed document
+
+The signature uses these settings:
+* http://www.w3.org/2000/09/xmldsig
+* enveloped mode
+* signs the document root element
+* canonicalization method of "http://www.w3.org/2001/10/xml-exc-c14n#"
+* signature method of rsa-sha256
+* sha256 digest
+
+All of these are hardcoded into the callout. To modify them, you will
+need to change the callout code. File a pull request if you think it's
+useful!
 
 ## Dependencies
 
@@ -31,7 +43,6 @@ Make sure these JARs are available as resources in the  proxy or in the environm
 
 * Bouncy Castle: bcprov-jdk15on-1.50.jar, bcpkix-jdk15on-1.50.jar
 * commons-lang3-3.7.jar
-
 
 ## Usage
 
@@ -100,7 +111,9 @@ There are some sample documents included in this repo that you can use for demon
 There are two distinct private keys embedded in the API Proxy. Both are RSA keys. Key 1 was generated this way:
 
 ```
- openssl genpkey  -aes-128-cbc -algorithm rsa -pkeyopt rsa_keygen_bits:2048 -out encrypted-genpkey-aes-128-cbc.pem
+ openssl genpkey -aes-128-cbc -algorithm rsa \
+     -pkeyopt rsa_keygen_bits:2048 \
+     -out encrypted-genpkey-aes-128-cbc.pem
 ```
 
 Key 2 generated with the "older" openssl syntax, this way:
@@ -157,7 +170,10 @@ Either form of PEM-encoded key works.
    curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate1  -H content-type:application/xml \
        --data-binary @./sample-data/order-signed2.xml
    ```
-   Because order-signed1 was signed with private key 2, validating it against public key 1 (via /validate1) will return "false", meaning "The signature on the document is not valid."   This is expected.
+   
+   Because order-signed1 was signed with private key 2, validating it
+   against public key 1 (via /validate1) will return "false", meaning
+   "The signature on the document is not valid."  This is expected.
 
 
 
