@@ -117,39 +117,45 @@ Either form of PEM-encoded key works.
    ```
    ORG=myorgname
    ENV=myenv
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/sign1  -H content-type:application/xml --data-binary @./sample-data/order.xml
+   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/sign1  -H content-type:application/xml \
+       --data-binary @./sample-data/order.xml
    ```
 
 * Signing with key 2
 
    ```
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/sign2  -H content-type:application/xml --data-binary @./sample-data/order.xml
+   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/sign2  -H content-type:application/xml \
+       --data-binary @./sample-data/order.xml
    ```
 * Validating with key 1
 
    ```
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate1  -H content-type:application/xml --data-binary @./sample-data/order-signed1.xml
+   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate1  -H content-type:application/xml \
+       --data-binary @./sample-data/order-signed1.xml
    ```
    The output of the above is "true", meaning "The signature on the document is valid."
 
 * Validating with key 2
 
    ```
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate2  -H content-type:application/xml --data-binary @./sample-data/order-signed2.xml
+   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate2  -H content-type:application/xml \
+       --data-binary @./sample-data/order-signed2.xml
    ```
    The output of the above is "true", meaning "The signature on the document is valid."
 
 * Validation fails with incorrect key
 
    ```
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate2  -H content-type:application/xml --data-binary @./sample-data/order-signed1.xml
+   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate2  -H content-type:application/xml \
+      --data-binary @./sample-data/order-signed1.xml
    ```
    Because order-signed1 was signed with private key 1, validating it against public key 2 (via /validate2) will return "false", meaning "The signature on the document is not valid."  This is expected.
 
 * Validation fails with incorrect key, case 2
 
    ```
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate1  -H content-type:application/xml --data-binary @./sample-data/order-signed2.xml
+   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate1  -H content-type:application/xml \
+       --data-binary @./sample-data/order-signed2.xml
    ```
    Because order-signed1 was signed with private key 2, validating it against public key 1 (via /validate1) will return "false", meaning "The signature on the document is not valid."   This is expected.
 
