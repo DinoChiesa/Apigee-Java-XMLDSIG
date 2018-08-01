@@ -86,6 +86,8 @@ The properties are:
 | source          | optional. the variable name in which to obtain the source signed document to validate. Defaults to message.content |
 | public-key      | required. the PEM-encoded RSA public key. You can use a variable reference here as shown above. |
 
+The result of the Validate callout is to set a single variable: xmldsig_valid.  It takes a true value if the signature was valid; false otherwise. You can use a Condition in your Proxy flow to examine that result.
+
 
 See [the example API proxy included here](./bundle) for a working example of these policy configurations.
 
