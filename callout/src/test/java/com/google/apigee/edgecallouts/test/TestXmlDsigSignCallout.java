@@ -1,9 +1,5 @@
 package com.google.apigee.edgecallouts.test;
 
-
-
-
-
 import com.apigee.flow.execution.ExecutionContext;
 import com.apigee.flow.execution.ExecutionResult;
 import com.apigee.flow.message.Message;
