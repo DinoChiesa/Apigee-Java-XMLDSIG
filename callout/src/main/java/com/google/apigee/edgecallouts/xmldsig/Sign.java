@@ -62,6 +62,7 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.openssl.PEMDecryptorProvider;
 import org.bouncycastle.openssl.PEMEncryptedKeyPair;
+import org.bouncycastle.openssl.PEMException;
 import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
@@ -71,6 +72,7 @@ import org.bouncycastle.operator.InputDecryptorProvider;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo;
 import org.bouncycastle.pkcs.PKCSException;
+import org.bouncycastle.util.encoders.Base64;
 import org.w3c.dom.Document;
 
 
@@ -123,18 +125,29 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
 
     private static KeyPair readKeyPair(String privateKeyPemString, String password)
         throws IOException, OperatorCreationException, PKCSException, InvalidKeySpecException, NoSuchAlgorithmException
-    {
+    {    	
+        if (privateKeyPemString == null) {
+            throw new IllegalStateException("PEM String is null");            
+        }
         if (password == null) password = "";
 
-        JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
         PEMParser pr = new PEMParser(new StringReader(privateKeyPemString));
         Object o = pr.readObject();
 
-        if (o == null || !((o instanceof PEMKeyPair) || (o instanceof PEMEncryptedKeyPair) || (o instanceof PKCS8EncryptedPrivateKeyInfo)) ) {
+        if (o == null) {
+            throw new IllegalStateException("Parsed object is null.  Bad input.");
+        }
+        if (!((o instanceof PEMKeyPair) || (o instanceof PEMEncryptedKeyPair) || 
+        	  (o instanceof PKCS8EncryptedPrivateKeyInfo) || (o instanceof PrivateKeyInfo))) {
             //System.out.printf("found %s\n", o.getClass().getName());
-            throw new IllegalStateException("Didn't find OpenSSL key");
+            throw new IllegalStateException("Didn't find OpenSSL key. Found: " + o.getClass().getName());
         }
 
+        JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+
+        if (o instanceof PrivateKeyInfo) {
+            return getKeyPairFromPrivateKey(converter.getPrivateKey((PrivateKeyInfo) o));
+        }
         if (o instanceof PKCS8EncryptedPrivateKeyInfo) {
             // produced by "openssl genpkey" or the series of commands reqd to sign an ec key
             //LOGGER.info("decodePrivateKey, encrypted PrivateKeyInfo");
@@ -142,16 +155,9 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
             JceOpenSSLPKCS8DecryptorProviderBuilder decryptorProviderBuilder = new JceOpenSSLPKCS8DecryptorProviderBuilder();
             InputDecryptorProvider decryptorProvider = decryptorProviderBuilder.build(password.toCharArray());
             PrivateKeyInfo privateKeyInfo = pkcs8EncryptedPrivateKeyInfo.decryptPrivateKeyInfo(decryptorProvider);
-            PrivateKey privateKey = converter.getPrivateKey(privateKeyInfo);
-
-            BigInteger publicExponent = BigInteger.valueOf(65537);
-            PublicKey publicKey = KeyFactory
-                .getInstance("RSA")
-                .generatePublic(new RSAPublicKeySpec(((RSAPrivateKey)privateKey).getPrivateExponent(), publicExponent));
-            return new KeyPair(publicKey, privateKey);
+            return getKeyPairFromPrivateKey(converter.getPrivateKey(privateKeyInfo));
         }
 
-        KeyPair kp;
         if (o instanceof PEMEncryptedKeyPair) {
             PEMDecryptorProvider decProv = new JcePEMDecryptorProviderBuilder().setProvider("BC")
                 .build(password.toCharArray());
@@ -161,6 +167,15 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
         return converter.getKeyPair((PEMKeyPair)o);
     }
 
+    private static KeyPair getKeyPairFromPrivateKey(PrivateKey privateKey) 
+    				throws PEMException, InvalidKeySpecException, NoSuchAlgorithmException {
+        BigInteger publicExponent = BigInteger.valueOf(65537);
+        PublicKey publicKey = KeyFactory
+            .getInstance("RSA")
+            .generatePublic(new RSAPublicKeySpec(((RSAPrivateKey)privateKey).getPrivateExponent(), publicExponent));
+        return new KeyPair(publicKey, privateKey);    	
+    }
+    
     private KeyPair getPrivateKey(MessageContext msgCtxt) throws Exception {
         String privateKeyPemString = getSimpleRequiredProperty("private-key", msgCtxt);
         privateKeyPemString = privateKeyPemString.trim();
