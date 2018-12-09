@@ -12,8 +12,10 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.xml.crypto.dsig.XMLSignature;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -159,9 +161,13 @@ public class TestXmlDsigSignCallout {
 "77vm5V4RuEKiGr0+7cBcswZ4mDd+OJQYCYHGoDbpYFO4Rgy7WakCLI6I32E373BX\n"+
 "WoAnf4VfajzL/IDHUQV8TuM8YB0X2WdyxxobXb8BepqgDe3Aq83JZheE0HxoPEmR\n"+
         "-----END RSA PRIVATE KEY-----\n";
-
-
-    private static final String simpleXml1 =
+    	
+    private static final String privateKey3 =
+"-----BEGIN PRIVATE KEY-----\n"+
+"MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDS00tbNFPsFw/ZExSv3DFxBFoXwKhDeape8LYUK5m7katvlPf7lwzWrKU0w6gYnJZ8gwgnpY35mTCqOvCU4fRnZLsiecuQE+VuibkfzNFrK9NkW8CrsZkAeSlZEJEslLdMzYH+en/6zCzeaRUkJbdN3U128kxvVUjPX4Bd/ITPPNrjEt9spZsvqrIgq1bRcN48kHvNsCMRVXFmpXGTgUKH9mkokcuVPqbS23xXG5lS6cJ8RQXAAJU5UP511biHpduoyqMqT3juPb1LxAWDztq9FMqAjtU3QLYPaWarjLsT7CQ14w2tUZ1pWP/JeAFqhyp32x9/3J4oRJLwdGTbwUY9AgMBAAECggEAB6PenDyGOg0P5vb5DfJ13DmjJi82KdPT58LjZlG6LYD27IFCh1yO+4ygJAxfIB00muiIuB8YyQ3TJKgkJdEWcVTGL1aomN0PuHTHP67FfBPHgmCM1+wEtm6tn+uoxyvQhLkB1/4Ke0VA7wJx4LB5Nxoo/4GCYZp+m/1DAqTvDy99hRuSTWt+VJacgPvfDMA2akFJAwUVSJwh/SyFZf2yqonzfnkHEK/hnC81vACs6usAj4wR04yj5yElXW+pQ5Vk4RUwR6Q0E8nKWLfYFrXygeYUbTSQEj0f44DGVHOdMdT+BoGV5SJ1ITs+peOCYjhVZvdngyCP9YNDtsLZftMLoQKBgQD2cxpph+h+8FsPHN/IjoqUpZ9HuCSxgUo0DorGnW0hewZ5AtZVARqONfhVeNt9TEgXFAHFtbdBYWlEhqT3yNPMpcM9gemuqyUOL35tHUCNccgKev2qyqHFQnUkRr+jRcch1yCmEvPYhPGZRh4KUzm7fuBVIJqROaZ0xBz7a8iv2QKBgQDa/sggatnPK0S9d4VF+a6mdCiUF3mEkROwwO2obUiNPuKRkgElHt8vx86Son2qdanPWYkOtrMFLpAKSFRbEtNNXtu0CgC2wMsPoo6W8IXDVxfl7tMaYpNJHs15IFxiIcTgXNxyTefRpRdTa4NTthtaIwnUVtenK7XOny8twdUvBQKBgQCoAZ2+1XTMnIQnEFMKQQn9/c5QsRrqmy3/wO4gKg/MZDbsZd/BQSheTDKH6gUPLOJ0QSJYKuHLw2Fk4rkxZgnlGBe6JYctmOSBACWasvdftXJemqu1M8AGXqDG4ygfYSE4U5ShQohTUYX2LFOsTEIuLHc38SsN15Q/Q7ZSO48rOQKBgHjIoTRP+oWqxaUCML1hcpRX6LGVKO6W3ZdVMT7911Af6PKE5qDEoDBIMYTqngjQELJOHavB1Ib9IXCqZ+w7O9Omh+KKyc4CE30yGRbi3cPZW1L0H/aje7yOgqFV2d495cohLWzVzw/v0CewWqRnAjr6rEczBoorL4EghvLjv2LJAoGBAMaAkmyjSVIKIf4T4Vz5BR0KXIx/qgIfQFRVgIFr5hDRlIBm8m13tzwgnXFba9D2DFinLo4SO8BZVPDbPPDz2IZWduv2c7eOT3NmwQlWg8kNgMZDif3nyIC4xX7k2ioP6eGh8G8jWfnhCW56uVMNgDsHY2kzSxXbwLs64zRqYMn3\n"+
+"-----END PRIVATE KEY-----\n";
+    
+	private static final String simpleXml1 =
 "<purchaseOrder xmlns='http://tempuri.org/po.xsd' orderDate='2017-05-20'>\n"+
 "    <shipTo country='US'>\n"+
 "        <name>Alice Smith</name>\n"+
@@ -313,6 +319,37 @@ public class TestXmlDsigSignCallout {
         Assert.assertEquals(nl.getLength(), 1, "test_ValidResult2() Signature element");
         System.out.println("=========================================================");
     }
+
+    @Test
+    public void test_ValidResult3() throws Exception {   
+        msgCtxt.setVariable("message.content", simpleXml1);
+        msgCtxt.setVariable("my-private-key", privateKey3);
+
+        Map<String,String> props = new HashMap<String,String>();
+        props.put("source","message.content");
+        props.put("private-key", "{my-private-key}");
+        props.put("private-key-password", "");
+        props.put("output-variable", "output");
+
+        Sign callout = new Sign(props);
+
+        // execute and retrieve output
+        ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
+        Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
+        Object exception = msgCtxt.getVariable("xmldsig_exception");
+        Assert.assertNull(exception, "test_ValidResult2() exception");
+        Object errorOutput = msgCtxt.getVariable("xmldsig_error");
+        Assert.assertNull(errorOutput, "errorOutput");
+        Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
+        Assert.assertNull(stacktrace, "test_ValidResult2() stacktrace");
+
+        String output = (String) msgCtxt.getVariable("output");
+        Document doc = docFromStream(new ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8)));
+        NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
+        Assert.assertEquals(nl.getLength(), 1, "test_ValidResult2() Signature element");
+        System.out.println("=========================================================");
+    }
+
 
 
 }
