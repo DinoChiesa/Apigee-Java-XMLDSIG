@@ -34,7 +34,6 @@ import javax.xml.crypto.dsig.XMLSignature;
 import javax.xml.crypto.dsig.XMLSignatureException;
 import javax.xml.crypto.dsig.XMLSignatureFactory;
 import javax.xml.crypto.dsig.dom.DOMValidateContext;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.bouncycastle.asn1.pkcs.RSAPublicKey;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
@@ -101,15 +100,15 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
             return ExecutionResult.SUCCESS;
         }
         catch (IllegalStateException exc1) {
-            setExceptionVariables(exc1,msgCtxt);
+            setExceptionVariables(exc1, msgCtxt);
             return ExecutionResult.ABORT;
         }
         catch (Exception e) {
             if (getDebug()) {
-                System.out.println(ExceptionUtils.getStackTrace(e));
+              String stacktrace = getStackTraceAsString(e);
+              msgCtxt.setVariable(varName("stacktrace"), stacktrace);
             }
             setExceptionVariables(e,msgCtxt);
-            msgCtxt.setVariable(varName("stacktrace"), ExceptionUtils.getStackTrace(e));
             return ExecutionResult.ABORT;
         }
     }

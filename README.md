@@ -2,7 +2,7 @@
 
 This directory contains the Java source code and pom.xml file required
 to compile a simple Java callout for Apigee Edge, that performs an
-XML Digiital Signature signing or validation, via [javax.xml.crypto.dsig.XMLSignature](https://docs.oracle.com/javase/9/docs/api/javax/xml/crypto/dsig/XMLSignature.html). When signing, this callout signs the entire document, and returns the resulting document.
+XML Digital Signature signing or validation, via [javax.xml.crypto.dsig.XMLSignature](https://docs.oracle.com/javase/9/docs/api/javax/xml/crypto/dsig/XMLSignature.html). When signing, this callout signs the entire document, and returns the resulting document.
 When validating, it verifies that the signature is valid.
 
 In all cases this callout uses RSA keys.
@@ -13,7 +13,7 @@ This example is not an official Google product, nor is it part of an official Go
 
 ## License
 
-This material is copyright 2018, Google LLC.
+This material is copyright 2018-2020, Google LLC.
 and is licensed under the Apache 2.0 license. See the [LICENSE](LICENSE) file.
 
 This code is open source but you don't need to compile it in order to use it.
@@ -41,8 +41,7 @@ useful!
 
 Make sure these JARs are available as resources in the  proxy or in the environment or organization.
 
-* Bouncy Castle: bcprov-jdk15on-1.50.jar, bcpkix-jdk15on-1.50.jar
-* commons-lang3-3.7.jar
+* Bouncy Castle: bcprov-jdk15on-1.60.jar, bcpkix-jdk15on-1.60.jar
 
 ## Usage
 
@@ -59,7 +58,7 @@ Configure the policy this way:
     <Property name='private-key-password'>{my_private_key_password}</Property>
   </Properties>
   <ClassName>com.google.apigee.edgecallouts.xmldsig.Sign</ClassName>
-  <ResourceURL>java://edge-xmldsig-1.0.1.jar</ResourceURL>
+  <ResourceURL>java://edge-xmldsig-20200219.jar</ResourceURL>
 </JavaCallout>
 ```
 
@@ -85,7 +84,7 @@ Configure the policy this way:
     <Property name='public-key'>{my_public_key}</Property>
   </Properties>
   <ClassName>com.google.apigee.edgecallouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://edge-xmldsig-1.0.1.jar</ResourceURL>
+  <ResourceURL>java://edge-xmldsig-20200219.jar</ResourceURL>
 </JavaCallout>
 ```
 
@@ -170,7 +169,7 @@ Either form of PEM-encoded key works.
    curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate1  -H content-type:application/xml \
        --data-binary @./sample-data/order-signed2.xml
    ```
-   
+
    Because order-signed1 was signed with private key 2, validating it
    against public key 1 (via /validate1) will return "false", meaning
    "The signature on the document is not valid."  This is expected.
