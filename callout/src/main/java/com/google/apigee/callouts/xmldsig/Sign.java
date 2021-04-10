@@ -1,4 +1,4 @@
-// Copyright 2018-2020 Google LLC
+// Copyright 2018-2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-package com.google.apigee.edgecallouts.xmldsig;
+package com.google.apigee.callouts.xmldsig;
 
 import com.apigee.flow.execution.ExecutionContext;
 import com.apigee.flow.execution.ExecutionResult;
@@ -395,12 +395,9 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
       SignConfiguration signConfiguration =
           new SignConfiguration()
               .withKey(getPrivateKey(msgCtxt))
-              // .withCertificate(getCertificate(msgCtxt))
               .withKeyIdentifierType(getKeyIdentifierType(msgCtxt))
-              // .withIssuerNameStyle(getIssuerNameStyle(msgCtxt))
               .withSigningMethod(getSigningMethod(msgCtxt))
               .withDigestMethod(getDigestMethod(msgCtxt));
-      // .withElementsToSign(getElementsToSign(msgCtxt));
 
       String resultingXmlString = sign_RSA(document, signConfiguration);
       String outputVar = getOutputVar(msgCtxt);

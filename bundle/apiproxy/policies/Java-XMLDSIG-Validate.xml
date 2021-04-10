@@ -3,6 +3,6 @@
     <Property name='source'>message.content</Property>
     <Property name='public-key'>{my_public_key}</Property>
   </Properties>
-  <ClassName>com.google.apigee.edgecallouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://edge-xmldsig-1.0.1.jar</ResourceURL>
+  <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
+  <ResourceURL>java://apigee-xmldsig-20210409.jar</ResourceURL>
 </JavaCallout>

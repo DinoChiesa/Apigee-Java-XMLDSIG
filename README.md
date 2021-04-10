@@ -1,7 +1,7 @@
-# Java XML Digital Signature Callout
+# Apigee Java callout for  XML Digital Signature
 
 This directory contains the Java source code and pom.xml file required
-to compile a simple Java callout for Apigee Edge, that performs an
+to compile a simple Java callout for Apigee , that performs an
 XML Digital Signature signing or validation, via [javax.xml.crypto.dsig.XMLSignature](https://docs.oracle.com/javase/9/docs/api/javax/xml/crypto/dsig/XMLSignature.html). When signing, this callout signs the entire document, and returns the resulting document.
 When validating, it verifies that the signature is valid.
 
@@ -13,7 +13,7 @@ This example is not an official Google product, nor is it part of an official Go
 
 ## License
 
-This material is copyright 2018-2020, Google LLC.
+This material is copyright 2018-2021, Google LLC.
 and is licensed under the Apache 2.0 license. See the [LICENSE](LICENSE) file.
 
 This code is open source but you don't need to compile it in order to use it.
@@ -22,8 +22,8 @@ This code is open source but you don't need to compile it in order to use it.
 
 There are two callout classes,
 
-* com.google.apigee.edgecallouts.xmldsig.Sign - signs the input document.
-* com.google.apigee.edgecallouts.xmldsig.Validate - validates the signed document
+* com.google.apigee.callouts.xmldsig.Sign - signs the input document.
+* com.google.apigee.callouts.xmldsig.Validate - validates the signed document
 
 The signature uses these settings:
 * http://www.w3.org/2000/09/xmldsig
@@ -57,8 +57,8 @@ Configure the policy this way:
     <Property name='private-key'>{my_private_key}</Property>
     <Property name='private-key-password'>{my_private_key_password}</Property>
   </Properties>
-  <ClassName>com.google.apigee.edgecallouts.xmldsig.Sign</ClassName>
-  <ResourceURL>java://edge-xmldsig-20200219.jar</ResourceURL>
+  <ClassName>com.google.apigee.callouts.xmldsig.Sign</ClassName>
+  <ResourceURL>java://apigee-xmldsig-20210409.jar</ResourceURL>
 </JavaCallout>
 ```
 
@@ -83,8 +83,8 @@ Configure the policy this way:
     <Property name='source'>message.content</Property>
     <Property name='public-key'>{my_public_key}</Property>
   </Properties>
-  <ClassName>com.google.apigee.edgecallouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://edge-xmldsig-20200219.jar</ResourceURL>
+  <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
+  <ResourceURL>java://apigee-xmldsig-20210409.jar</ResourceURL>
 </JavaCallout>
 ```
 
