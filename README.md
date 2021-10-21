@@ -37,11 +37,16 @@ All of these are hardcoded into the callout. To modify them, you will
 need to change the callout code. File a pull request if you think it's
 useful!
 
-## Dependencies
+## Runtime Dependencies
 
-Make sure these JARs are available as resources in the  proxy or in the environment or organization.
+* Bouncy Castle: bcprov-jdk15on-1.6x.jar, bcpkix-jdk15on-1.6x.jar
 
-* Bouncy Castle: bcprov-jdk15on-1.60.jar, bcpkix-jdk15on-1.60.jar
+The BouncyCastle jar is available as part of the Apigee runtime, although it is
+not a documented part of the Apigee platform and is therefore not guaranteed to
+remain available. In the highly unlikely future scenario in which Apigee removes
+the BC jar from the Apigee runtime, you could simply upload the BouncyCastle jar
+as a resource, either with the apiproxy or with the organization or environment,
+to resolve the dependency.
 
 ## Usage
 
