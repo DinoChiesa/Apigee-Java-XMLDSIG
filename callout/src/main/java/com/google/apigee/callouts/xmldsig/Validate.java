@@ -18,7 +18,6 @@ package com.google.apigee.callouts.xmldsig;
 import com.apigee.flow.execution.ExecutionContext;
 import com.apigee.flow.execution.ExecutionResult;
 import com.apigee.flow.execution.spi.Execution;
-import com.apigee.flow.message.Message;
 import com.apigee.flow.message.MessageContext;
 import java.io.IOException;
 import java.io.StringReader;
@@ -43,74 +42,68 @@ import org.w3c.dom.NodeList;
 
 public class Validate extends XmlDsigCalloutBase implements Execution {
 
-    public Validate(Map properties) {
-        super(properties);
+  public Validate(Map properties) {
+    super(properties);
+  }
+
+  private static PublicKey readPublicKey(String publicKeyPemString)
+      throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+    PEMParser pr = new PEMParser(new StringReader(publicKeyPemString));
+    Object o = pr.readObject();
+    if (o instanceof SubjectPublicKeyInfo) {
+      SubjectPublicKeyInfo subjectPublicKeyInfo = (SubjectPublicKeyInfo) o;
+      RSAPublicKey pubKey = RSAPublicKey.getInstance(subjectPublicKeyInfo.parsePublicKey());
+
+      PublicKey publicKey =
+          KeyFactory.getInstance("RSA")
+              .generatePublic(
+                  new RSAPublicKeySpec(pubKey.getModulus(), pubKey.getPublicExponent()));
+
+      return publicKey;
     }
+    throw new IllegalStateException("Didn't find an RSA Public Key");
+  }
 
-    private static PublicKey readPublicKey(String publicKeyPemString)
-        throws NoSuchAlgorithmException, InvalidKeySpecException, IOException
-    {
-        PEMParser pr = new PEMParser(new StringReader(publicKeyPemString));
-        Object o = pr.readObject();
-        if (o instanceof SubjectPublicKeyInfo) {
-            SubjectPublicKeyInfo subjectPublicKeyInfo = (SubjectPublicKeyInfo) o;
-            RSAPublicKey pubKey = RSAPublicKey.getInstance(subjectPublicKeyInfo.parsePublicKey());
+  private PublicKey getPublicKey(MessageContext msgCtxt) throws Exception {
+    String publicKeyPemString = getSimpleRequiredProperty("public-key", msgCtxt);
+    publicKeyPemString = publicKeyPemString.trim();
 
-            PublicKey publicKey = KeyFactory
-                .getInstance("RSA")
-                .generatePublic(new RSAPublicKeySpec(pubKey.getModulus(), pubKey.getPublicExponent()));
+    // clear any leading whitespace on each line
+    publicKeyPemString = publicKeyPemString.replaceAll("([\\r|\\n] +)", "\n");
+    return readPublicKey(publicKeyPemString);
+  }
 
-            return publicKey;
-        }
-        throw new IllegalStateException("Didn't find an RSA Public Key");
+  private static boolean validate_RSA_SHA256(Document doc, PublicKey publicKey)
+      throws MarshalException, XMLSignatureException {
+    NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
+    if (nl.getLength() == 0) {
+      throw new RuntimeException("Couldn't find 'Signature' element");
     }
+    Element element = (Element) nl.item(0);
+    KeySelector ks = KeySelector.singletonKeySelector(publicKey);
+    DOMValidateContext vc = new DOMValidateContext(ks, element);
+    XMLSignatureFactory signatureFactory = XMLSignatureFactory.getInstance("DOM");
+    XMLSignature signature = signatureFactory.unmarshalXMLSignature(vc);
+    return signature.validate(vc);
+  }
 
-    private PublicKey getPublicKey(MessageContext msgCtxt) throws Exception {
-        String publicKeyPemString = getSimpleRequiredProperty("public-key", msgCtxt);
-        publicKeyPemString = publicKeyPemString.trim();
-
-        // clear any leading whitespace on each line
-        publicKeyPemString = publicKeyPemString.replaceAll("([\\r|\\n] +)","\n");
-        return readPublicKey(publicKeyPemString);
+  public ExecutionResult execute(final MessageContext msgCtxt, final ExecutionContext execContext) {
+    try {
+      Document document = getDocument(msgCtxt);
+      PublicKey publicKey = getPublicKey(msgCtxt);
+      boolean isValid = validate_RSA_SHA256(document, publicKey);
+      msgCtxt.setVariable(varName("valid"), isValid);
+      return ExecutionResult.SUCCESS;
+    } catch (IllegalStateException exc1) {
+      setExceptionVariables(exc1, msgCtxt);
+      return ExecutionResult.ABORT;
+    } catch (Exception e) {
+      if (getDebug()) {
+        String stacktrace = getStackTraceAsString(e);
+        msgCtxt.setVariable(varName("stacktrace"), stacktrace);
+      }
+      setExceptionVariables(e, msgCtxt);
+      return ExecutionResult.ABORT;
     }
-
-    private static boolean validate_RSA_SHA256(Document doc, PublicKey publicKey)
-        throws MarshalException,
-               XMLSignatureException
-    {
-        NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
-        if (nl.getLength() == 0) {
-            throw new RuntimeException("Couldn't find 'Signature' element");
-        }
-        Element element = (Element) nl.item(0);
-        KeySelector ks = KeySelector.singletonKeySelector(publicKey);
-        DOMValidateContext vc = new DOMValidateContext(ks, element);
-        XMLSignatureFactory signatureFactory = XMLSignatureFactory.getInstance("DOM");
-        XMLSignature signature = signatureFactory.unmarshalXMLSignature(vc);
-        return signature.validate(vc);
-    }
-
-    public ExecutionResult execute (final MessageContext msgCtxt,
-                                    final ExecutionContext execContext) {
-        try {
-            Document document = getDocument(msgCtxt);
-            PublicKey publicKey = getPublicKey(msgCtxt);
-            boolean isValid = validate_RSA_SHA256(document, publicKey);
-            msgCtxt.setVariable(varName("valid"), isValid);
-            return ExecutionResult.SUCCESS;
-        }
-        catch (IllegalStateException exc1) {
-            setExceptionVariables(exc1, msgCtxt);
-            return ExecutionResult.ABORT;
-        }
-        catch (Exception e) {
-            if (getDebug()) {
-              String stacktrace = getStackTraceAsString(e);
-              msgCtxt.setVariable(varName("stacktrace"), stacktrace);
-            }
-            setExceptionVariables(e,msgCtxt);
-            return ExecutionResult.ABORT;
-        }
-    }
-
+  }
 }
