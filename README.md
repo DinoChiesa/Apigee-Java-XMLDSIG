@@ -132,22 +132,27 @@ Either form of PEM-encoded key works.
 * Signing with key 1
 
    ```
+   # Apigee Edge
    ORG=myorgname
    ENV=myenv
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/sign1  -H content-type:application/xml \
+   endpoint=https://${ORG}-${ENV}.apigee.net
+   # Apigee X
+   endpoint=https://my-apigee-x.example.org
+
+   curl -i $endpoint/xmldsig/sign1  -H content-type:application/xml \
        --data-binary @./sample-data/order.xml
    ```
 
 * Signing with key 2
 
    ```
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/sign2  -H content-type:application/xml \
+   curl -i $endpoint/xmldsig/sign2  -H content-type:application/xml \
        --data-binary @./sample-data/order.xml
    ```
 * Validating with key 1
 
    ```
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate1  -H content-type:application/xml \
+   curl -i $endpoint/xmldsig/validate1  -H content-type:application/xml \
        --data-binary @./sample-data/order-signed1.xml
    ```
    The output of the above is "true", meaning "The signature on the document is valid."
@@ -155,7 +160,7 @@ Either form of PEM-encoded key works.
 * Validating with key 2
 
    ```
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate2  -H content-type:application/xml \
+   curl -i $endpoint/xmldsig/validate2  -H content-type:application/xml \
        --data-binary @./sample-data/order-signed2.xml
    ```
    The output of the above is "true", meaning "The signature on the document is valid."
@@ -163,7 +168,7 @@ Either form of PEM-encoded key works.
 * Validation fails with incorrect key
 
    ```
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate2  -H content-type:application/xml \
+   curl -i $endpoint/xmldsig/validate2  -H content-type:application/xml \
       --data-binary @./sample-data/order-signed1.xml
    ```
    Because order-signed1 was signed with private key 1, validating it against public key 2 (via /validate2) will return "false", meaning "The signature on the document is not valid."  This is expected.
@@ -171,7 +176,7 @@ Either form of PEM-encoded key works.
 * Validation fails with incorrect key, case 2
 
    ```
-   curl -i https://${ORG}-${ENV}.apigee.net/xmldsig/validate1  -H content-type:application/xml \
+   curl -i $endpoint/xmldsig/validate1  -H content-type:application/xml \
        --data-binary @./sample-data/order-signed2.xml
    ```
 
