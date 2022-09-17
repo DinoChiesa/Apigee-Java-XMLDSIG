@@ -144,7 +144,7 @@ public class TestXmlDsigSignCallout extends TestBase {
   }
 
   @Test
-  public void test_EmptySource() throws Exception {
+  public void emptySource() throws Exception {
     String expectedError = "source variable resolves to null";
     msgCtxt.setVariable("message-content", simpleXml1);
 
@@ -161,12 +161,12 @@ public class TestXmlDsigSignCallout extends TestBase {
     // System.out.printf("expected error: %s\n", errorOutput);
     Assert.assertEquals(errorOutput, expectedError, "error not as expected");
     Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
-    Assert.assertNull(stacktrace, "EmptySource() stacktrace");
+    Assert.assertNull(stacktrace, "emptySource() stacktrace");
     System.out.println("=========================================================");
   }
 
   @Test
-  public void test_MissingPrivateKey() throws Exception {
+  public void missingPrivateKey() throws Exception {
     String expectedError = "private-key resolves to an empty string";
 
     msgCtxt.setVariable("message.content", simpleXml1);
@@ -180,25 +180,24 @@ public class TestXmlDsigSignCallout extends TestBase {
     ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
     Assert.assertEquals(actualResult, ExecutionResult.ABORT, "result not as expected");
     Object exception = msgCtxt.getVariable("xmldsig_exception");
-    Assert.assertNotNull(exception, "test_MissingPrivateKey() exception");
+    Assert.assertNotNull(exception, "missingPrivateKey() exception");
     Object errorOutput = msgCtxt.getVariable("xmldsig_error");
     Assert.assertNotNull(errorOutput, "errorOutput");
     // System.out.printf("expected error: %s\n", errorOutput);
     Assert.assertEquals(errorOutput, expectedError, "error not as expected");
     Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
-    Assert.assertNull(stacktrace, "test_MissingPrivateKey() stacktrace");
+    Assert.assertNull(stacktrace, "missingPrivateKey() stacktrace");
     System.out.println("=========================================================");
   }
 
   @Test
-  public void test_ValidResult1() throws Exception {
-    String expectedError = "private-key resolves to an empty string";
-
+  public void validResult1() throws Exception {
     msgCtxt.setVariable("message.content", simpleXml1);
     msgCtxt.setVariable("my-private-key", privateKey1);
 
     Map<String, String> props = new HashMap<String, String>();
     props.put("source", "message.content");
+    props.put("debug", "true");
     props.put("private-key", "{my-private-key}");
     props.put("private-key-password", "Secret123");
     props.put("output-variable", "output");
@@ -209,22 +208,61 @@ public class TestXmlDsigSignCallout extends TestBase {
     ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
     Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
     Object exception = msgCtxt.getVariable("xmldsig_exception");
-    Assert.assertNull(exception, "test_ValidResult1() exception");
+    Assert.assertNull(exception, "validResult1() exception");
     Object errorOutput = msgCtxt.getVariable("xmldsig_error");
     Assert.assertNull(errorOutput, "error not as expected");
     Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
-    Assert.assertNull(stacktrace, "test_ValidResult1() stacktrace");
+    Assert.assertNull(stacktrace, "validResult1() stacktrace");
 
     String output = (String) msgCtxt.getVariable("output");
     Document doc = docFromStream(new ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8)));
     NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
-    Assert.assertEquals(nl.getLength(), 1, "test_ValidResult1() Signature element");
+    Assert.assertEquals(nl.getLength(), 1, "validResult1() Signature element");
     System.out.println("=========================================================");
   }
 
   @Test
-  public void test_ValidResult2() throws Exception {
+  public void valid_KeyIdentifier_Cert() throws Exception {
+    String privateKeyString =
+        getResourceFileContents("keys-and-certs", "rsa-private-key-20220916.pem");
+    String certString = getResourceFileContents("keys-and-certs", "x509-certificate-20220916.pem");
 
+    msgCtxt.setVariable("message.content", simpleXml1);
+    msgCtxt.setVariable("my-private-key", privateKeyString);
+    msgCtxt.setVariable("my-cert", certString);
+    msgCtxt.setVariable("debug", "true");
+
+    Map<String, String> props = new HashMap<String, String>();
+    props.put("source", "message.content");
+    props.put("debug", "true");
+    props.put("private-key", "{my-private-key}");
+    props.put("key-identifier-type", "x509_cert_direct");
+    props.put("certificate", "{my-cert}");
+    props.put("output-variable", "output");
+
+    Sign callout = new Sign(props);
+
+    // execute and retrieve output
+    ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
+    Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
+    Object exception = msgCtxt.getVariable("xmldsig_exception");
+    Assert.assertNull(exception, "valid_KeyIdentifier_Cert() exception");
+    Object errorOutput = msgCtxt.getVariable("xmldsig_error");
+    Assert.assertNull(errorOutput, "error not as expected");
+    Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
+    Assert.assertNull(stacktrace, "valid_KeyIdentifier_Cert() stacktrace");
+
+    String output = (String) msgCtxt.getVariable("output");
+    System.out.printf("%s\n", output);
+
+    Document doc = docFromStream(new ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8)));
+    NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
+    Assert.assertEquals(nl.getLength(), 1, "valid_KeyIdentifier_Cert() Signature element");
+    System.out.println("=========================================================");
+  }
+
+  @Test
+  public void validResult2() throws Exception {
     msgCtxt.setVariable("message.content", simpleXml1);
     msgCtxt.setVariable("my-private-key", privateKey2);
 
@@ -240,21 +278,21 @@ public class TestXmlDsigSignCallout extends TestBase {
     ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
     Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
     Object exception = msgCtxt.getVariable("xmldsig_exception");
-    Assert.assertNull(exception, "test_ValidResult2() exception");
+    Assert.assertNull(exception, "validResult2() exception");
     Object errorOutput = msgCtxt.getVariable("xmldsig_error");
     Assert.assertNull(errorOutput, "errorOutput");
     Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
-    Assert.assertNull(stacktrace, "test_ValidResult2() stacktrace");
+    Assert.assertNull(stacktrace, "validResult2() stacktrace");
 
     String output = (String) msgCtxt.getVariable("output");
     Document doc = docFromStream(new ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8)));
     NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
-    Assert.assertEquals(nl.getLength(), 1, "test_ValidResult2() Signature element");
+    Assert.assertEquals(nl.getLength(), 1, "validResult2() Signature element");
     System.out.println("=========================================================");
   }
 
   @Test
-  public void test_ValidResult3() throws Exception {
+  public void validResult3() throws Exception {
     msgCtxt.setVariable("message.content", simpleXml1);
     msgCtxt.setVariable("my-private-key", privateKey3);
 
@@ -270,16 +308,16 @@ public class TestXmlDsigSignCallout extends TestBase {
     ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
     Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
     Object exception = msgCtxt.getVariable("xmldsig_exception");
-    Assert.assertNull(exception, "test_ValidResult2() exception");
+    Assert.assertNull(exception, "validResult3() exception");
     Object errorOutput = msgCtxt.getVariable("xmldsig_error");
     Assert.assertNull(errorOutput, "errorOutput");
     Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
-    Assert.assertNull(stacktrace, "test_ValidResult2() stacktrace");
+    Assert.assertNull(stacktrace, "validResult3() stacktrace");
 
     String output = (String) msgCtxt.getVariable("output");
     Document doc = docFromStream(new ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8)));
     NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
-    Assert.assertEquals(nl.getLength(), 1, "test_ValidResult2() Signature element");
+    Assert.assertEquals(nl.getLength(), 1, "validResult3() Signature element");
     System.out.println("=========================================================");
   }
 }

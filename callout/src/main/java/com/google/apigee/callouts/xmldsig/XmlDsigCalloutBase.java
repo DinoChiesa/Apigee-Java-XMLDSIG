@@ -1,4 +1,4 @@
-// Copyright 2018-2021 Google LLC
+// Copyright 2018-2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,7 +37,11 @@ import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
 import javax.security.auth.x500.X500Principal;
 import javax.xml.bind.DatatypeConverter;
+import javax.xml.crypto.dsig.XMLSignature;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 public abstract class XmlDsigCalloutBase {
   private static final String _varprefix = "xmldsig_";
@@ -45,6 +49,9 @@ public abstract class XmlDsigCalloutBase {
   private static final String variableReferencePatternString = "(.*?)\\{([^\\{\\} ]+?)\\}(.*?)";
   private static final Pattern variableReferencePattern =
       Pattern.compile(variableReferencePatternString);
+
+  public static final String RSA_SHA1 = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+  public static final String RSA_SHA256 = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256";
 
   public XmlDsigCalloutBase(Map properties) {
     this.properties = properties;
@@ -63,7 +70,38 @@ public abstract class XmlDsigCalloutBase {
     if (text == null) {
       throw new IllegalStateException("source variable resolves to null");
     }
-    return XmlUtils.parseXml(text);
+    Document doc = XmlUtils.parseXml(text);
+    String reformSignedInfo = getSimpleOptionalProperty("reform-signedinfo", msgCtxt);
+    if ("true".equals(reformSignedInfo)) {
+      NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
+      if (nl.getLength() == 0) {
+        throw new RuntimeException("Couldn't find 'Signature' element");
+      }
+      Element element = (Element) nl.item(0);
+      nl = element.getElementsByTagNameNS(XMLSignature.XMLNS, "SignedInfo");
+      if (nl.getLength() == 0) {
+        throw new RuntimeException("Couldn't find 'SignedInfo' element");
+      }
+      Element signedInfo = (Element) nl.item(0);
+      removeWhitespaceTextNodes(signedInfo);
+    }
+    return doc;
+  }
+
+  private void removeWhitespaceTextNodes(Node currentNode) {
+    // remove descendant text nodes that are empty/whitespace
+    NodeList children = currentNode.getChildNodes();
+    for (int i = children.getLength() - 1; i >= 0; i--) {
+      Node n = (Node) children.item(i);
+      if (n.getNodeType() == Node.TEXT_NODE) {
+        String t = n.getTextContent();
+        if (t == null || t.trim().equals("")) {
+          currentNode.removeChild(n);
+        }
+      } else if (n.getNodeType() == Node.ELEMENT_NODE) {
+        removeWhitespaceTextNodes(n);
+      }
+    }
   }
 
   protected boolean getDebug() {
@@ -136,13 +174,41 @@ public abstract class XmlDsigCalloutBase {
   protected void setExceptionVariables(Exception exc1, MessageContext msgCtxt) {
     String error = exc1.toString();
     msgCtxt.setVariable(varName("exception"), error);
-    System.out.printf("Exception: %s\n", error);
+    // System.out.printf("Exception: %s\n", error);
     int ch = error.lastIndexOf(':');
     if (ch >= 0) {
       msgCtxt.setVariable(varName("error"), error.substring(ch + 2).trim());
     } else {
       msgCtxt.setVariable(varName("error"), error);
     }
+  }
+
+  enum KeyIdentifierType {
+    NOT_SPECIFIED,
+    X509_CERT_DIRECT,
+    RSA_KEY_VALUE;
+    // THUMBPRINT,
+    // BST_DIRECT_REFERENCE,
+    // ISSUER_SERIAL;
+
+    static KeyIdentifierType fromString(String s) {
+      for (KeyIdentifierType t : KeyIdentifierType.values()) {
+        if (t.name().equals(s)) return t;
+      }
+      return KeyIdentifierType.NOT_SPECIFIED;
+    }
+  }
+
+  protected KeyIdentifierType getKeyIdentifierType(MessageContext msgCtxt) throws Exception {
+    String kitString = getSimpleOptionalProperty("key-identifier-type", msgCtxt);
+    if (kitString == null) return KeyIdentifierType.RSA_KEY_VALUE;
+    kitString = kitString.trim().toUpperCase();
+    KeyIdentifierType t = KeyIdentifierType.fromString(kitString);
+    if (t == KeyIdentifierType.NOT_SPECIFIED) {
+      msgCtxt.setVariable(varName("warning"), "unrecognized key-identifier-type");
+      return KeyIdentifierType.RSA_KEY_VALUE;
+    }
+    return t;
   }
 
   enum IssuerNameStyle {
@@ -161,13 +227,37 @@ public abstract class XmlDsigCalloutBase {
     return IssuerNameStyle.SHORT;
   }
 
+  protected String getSigningMethod(MessageContext msgCtxt) throws Exception {
+    String signingMethod = getSimpleOptionalProperty("signing-method", msgCtxt);
+    if (signingMethod == null) return null;
+    signingMethod = signingMethod.trim();
+    // warn on invalid values
+    if (!signingMethod.toLowerCase().equals("rsa-sha1")
+        && !signingMethod.toLowerCase().equals("rsa-sha256")) {
+      msgCtxt.setVariable(varName("WARNING"), "invalid value for signing-method");
+      return "rsa-sha256";
+    }
+    return signingMethod;
+  }
+
+  protected String getDigestMethod(MessageContext msgCtxt) throws Exception {
+    String digestMethod = getSimpleOptionalProperty("digest-method", msgCtxt);
+    if (digestMethod == null) return null;
+    digestMethod = digestMethod.trim();
+    // warn on invalid values
+    if (!digestMethod.toLowerCase().equals("sha1")
+        && !digestMethod.toLowerCase().equals("sha256")) {
+      msgCtxt.setVariable(varName("WARNING"), "invalid value for digest-method");
+      return "sha256";
+    }
+    return digestMethod;
+  }
 
   protected static String reformIndents(String s) {
     return s.trim().replaceAll("([\\r|\\n|\\r\\n] *)", "\n");
   }
 
-  protected static String getCommonName(X500Principal principal)
-    throws InvalidNameException {
+  protected static String getCommonName(X500Principal principal) throws InvalidNameException {
     LdapName ldapDN = new LdapName(principal.getName());
     String cn = null;
     for (Rdn rdn : ldapDN.getRdns()) {
@@ -179,13 +269,12 @@ public abstract class XmlDsigCalloutBase {
     return cn;
   }
 
-  protected static Certificate certificateFromPEM(String certificateString)
-      throws KeyException {
+  protected static Certificate certificateFromPEM(String certificateString) throws KeyException {
     try {
       CertificateFactory certFactory = CertificateFactory.getInstance("X.509", "BC");
       certificateString = reformIndents(certificateString);
       Certificate certificate =
-        certFactory.generateCertificate(
+          certFactory.generateCertificate(
               new ByteArrayInputStream(certificateString.getBytes(StandardCharsets.UTF_8)));
       return certificate;
     } catch (Exception ex) {
@@ -205,6 +294,13 @@ public abstract class XmlDsigCalloutBase {
             MessageDigest.getInstance("SHA-1").digest(certificate.getEncoded()))
         .toLowerCase();
   }
+
+  // protected static String getThumbprintSha256(X509Certificate certificate)
+  //   throws NoSuchAlgorithmException, CertificateEncodingException {
+  //   return DatatypeConverter.printHexBinary(
+  //       MessageDigest.getInstance("SHA-256").digest(
+  //               certificate.getEncoded())).toLowerCase();
+  // }
 
   protected static String getStackTraceAsString(Throwable t) {
     StringWriter sw = new StringWriter();

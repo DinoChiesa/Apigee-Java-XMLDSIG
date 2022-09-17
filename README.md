@@ -30,10 +30,11 @@ The signature uses these settings:
 * enveloped mode
 * signs the document root element
 * canonicalization method of "http://www.w3.org/2001/10/xml-exc-c14n#"
-* signature method of rsa-sha256
-* sha256 digest
+* signature method of rsa-sha256 or rsa-sha1. The latter is dis-recommended.
+* sha256 or SHA1 digest. SHA1 is dis-recommended.
+* embeds the key identifier as an RSA public key directly, or with an X509 certificate.
 
-All of these are hardcoded into the callout. To modify them, you will
+These behaviors are hardcoded into the callout. To modify them, you will
 need to change the callout code. File a pull request if you think it's
 useful!
 
@@ -63,20 +64,25 @@ Configure the policy this way:
     <Property name='private-key-password'>{my_private_key_password}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Sign</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20210409.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20220916.jar</ResourceURL>
 </JavaCallout>
 ```
 
-The properties are:
+This policy will sign the entire document and embed a Signature element as a child of the root element.
+
+
+The available properties for signing are:
 
 | name                 | description |
 | -------------------- | ------------ |
-| source               | optional. the variable name in which to obtain the source document to sign. Defaults to message.content |
-| output-variable      | optional. the variable name in which to write the signed XML. Defaults to message.content |
-| private-key          | required. the PEM-encoded RSA private key. You can use a variable reference here as shown above. Probably you want to read this from encrypted KVM. |
-| private-key-password | optional. The password for the key if any. |
-
-This policy will sign the entire document and embed a Signature element as a child of the root element.
+| `source`               | optional. the variable name in which to obtain the source document to sign. Defaults to `message.content` |
+| `output-variable`      | optional. the variable name in which to write the signed XML. Defaults to message.content |
+| `signing-method` | optional. Either `rsa-sha1` or `rsa-sha256`. Defaults to `rsa-sha256`. |
+| `digest-method` | optional. Either `sha1` or `sha256`. Defaults to `sha256`. |
+| `private-key`          | required. the PEM-encoded RSA private key. You can use a variable reference here as shown above. Probably you want to read this from encrypted KVM. |
+| `private-key-password` | optional. The password for the key if any. |
+| `key-identifier-type` | optional. Either `RSA_KEY_VALUE` or `X509_CERT_DIRECT`. Defaults to `RSA_KEY_VALUE` |
+| `certificate` | optional. Specifies the PEM-encoded certificate to embed into the signed document. Useful only when `key-identifier-type` is `X509_CERT_DIRECT`. |
 
 ### Validating
 
@@ -89,16 +95,21 @@ Configure the policy this way:
     <Property name='public-key'>{my_public_key}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20210409.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20220916.jar</ResourceURL>
 </JavaCallout>
 ```
 
-The properties are:
+The available properties for validating are:
 
 | name            | description |
 | --------------- | ------------ |
-| source          | optional. the variable name in which to obtain the source signed document to validate. Defaults to message.content |
-| public-key      | required. the PEM-encoded RSA public key. You can use a variable reference here as shown above. |
+| `source`          | optional. the variable name in which to obtain the source signed document to validate. Defaults to `message.content` |
+| `signing-method` | optional. Either `rsa-sha1` or `rsa-sha256`. If set, checks that the signature uses this signing method. |
+| `digest-method` | optional. Either `sha1` or `sha256`. If set, checks that the signature uses this digest method. |
+| `public-key`      | optional. the PEM-encoded RSA public key. You can use a variable reference here as shown above. |
+| `key-identifier-type` | optional. Either `RSA_KEY_VALUE` or `X509_CERT_DIRECT`. Defaults to `RSA_KEY_VALUE`. If you specify  `X509_CERT_DIRECT`, the policy will extract the certificate from the signed document, and extract the public key from that certificate. You must set `certificate-thumbprint` in this case, to the SHA-1 thumbprint of the trusted certificate. This policy does not check validity of the certificate. |
+| `certificate-thumbprint` | optional. the SHA-1 thumbprint of the certificate that is trusted. Used only when `key-identifier-type` is `X509_CERT_DIRECT`. |
+| `reform-signedinfo`      | optional. Specify `true` to tell the validating callout to reform the `SignedInfo` element to remove spaces and newlines, before validating the signature. |
 
 The result of the Validate callout is to set a single variable: xmldsig_valid.  It takes a true value if the signature was valid; false otherwise. You can use a Condition in your Proxy flow to examine that result.
 
@@ -280,6 +291,43 @@ JKgkJdEWcVTGL1aomN0PuHTHP67FfBPHgmCM1+wEtm6tn+uoxyvQhLkB1/4Ke0VA7wJx4LB5Nxoo
 vACs6usAj4wR04yj5yElXW+pQ5Vk4RUwR6Q0E8nKWLfYFrXygeYUbTSQEj0f44DGVHOdMdT+BoGV
 5SJ1ITs+peOCYjhVZvdngyCP9YNDtsLZftMLoQ==</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue></KeyInfo></Signature></order>
 ```
+
+## Notes
+
+XML Digital Signature is sensitive to whitespace!
+
+The signature is computed over a sub-tree in an XML Document. Before signing,
+the signer normalizes the sub-tree with a "canonicalization" (aka C14N)
+algorithm. The standard C14N algorithm preserves line breaks and white spaces
+(see http://www.w3.org/TR/xml-c14n#Example-WhitespaceInContent).
+
+Signing a document results in inserting a Signature element with a SignedInfo
+child element into the document. Most signers produce a SignedInfo element that
+has no newlines or whitespace, as shown in the examples above. This can make it
+difficult for humans to read or parse, which encourages humans to "pretty print"
+the signedd XML. Be careful when doing so!
+
+* If you sign a sub-tree within a document, then modify the whitespace of the
+  sub-tree that has been signed, then validating the signature will fail.
+
+* But, if you sign a sub-tree within a document, then modify the SignedInfo
+  element that denotes the thing that has been signed, for example, by inserting
+  newlines and indents to make it more legible, validating the signature will
+  fail.
+
+This is just how XML Signature works. It's not particular to this callout, or
+its use within Apigee.
+
+There is one partial mitigation for this - you can tell the callout to "reform"
+the `SignedInfo` element before validating, to remove all spaces and
+newlines. Do this by adding the `reform-signedinfo` property to the callout
+configuration. This will not work to avoid whitespace problems with the signed
+sub-tree! It works only on the `SignedInfo` element.
+
+To avoid all of this, do not modify the signed document before validation.
+
+
+None reported.
 
 ## Bugs
 

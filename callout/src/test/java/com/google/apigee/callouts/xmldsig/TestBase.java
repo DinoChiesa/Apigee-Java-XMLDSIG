@@ -19,6 +19,9 @@ import com.apigee.flow.execution.ExecutionContext;
 import com.apigee.flow.message.Message;
 import com.apigee.flow.message.MessageContext;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import mockit.Mock;
@@ -26,6 +29,7 @@ import mockit.MockUp;
 import org.testng.annotations.BeforeMethod;
 
 public class TestBase {
+  private static final String testResourceDir = "src/test/resources";
 
   static {
     java.security.Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
@@ -35,6 +39,8 @@ public class TestBase {
   InputStream messageContentStream;
   Message message;
   ExecutionContext exeCtxt;
+
+  Boolean verbose = false; // true
 
   @BeforeMethod()
   public void beforeMethod() {
@@ -52,13 +58,20 @@ public class TestBase {
             if (variables == null) {
               variables = new HashMap<String, Object>();
             }
-            return variables.get(name);
+            Object value = variables.get(name);
+            if (verbose) {
+              System.out.printf("getVariable(%s) => %s\n", name, value==null?"-null-":value.toString());
+            }
+            return value;
           }
 
           @Mock()
           public boolean setVariable(final String name, final Object value) {
             if (variables == null) {
               variables = new HashMap<String, Object>();
+            }
+            if (verbose) {
+              System.out.printf("setVariable(%s) => %s\n", name, value==null?"-null-":value.toString());
             }
             variables.put(name, value);
             return true;
@@ -68,6 +81,9 @@ public class TestBase {
           public boolean removeVariable(final String name) {
             if (variables == null) {
               variables = new HashMap<String, Object>();
+            }
+            if (verbose) {
+              System.out.printf("removeVariable(%s)\n", name );
             }
             if (variables.containsKey(name)) {
               variables.remove(name);
@@ -92,4 +108,14 @@ public class TestBase {
           }
         }.getMockInstance();
   }
+
+  protected static String getResourceFileContents(String childDir, String filename) throws Exception {
+    Path path = Paths.get(testResourceDir, childDir, filename);
+    if (! Files.exists(path)) {
+      return null;
+    }
+    return new String(Files.readAllBytes(path));
+  }
+
+
 }

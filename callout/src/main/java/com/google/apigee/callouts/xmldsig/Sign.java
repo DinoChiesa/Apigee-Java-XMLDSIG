@@ -1,4 +1,4 @@
-// Copyright 2018-2021 Google LLC
+// Copyright 2018-2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,6 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.InvalidKeySpecException;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import javax.naming.InvalidNameException;
 import javax.security.auth.x500.X500Principal;
@@ -105,9 +104,9 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
     // add <SignatureMethod Algorithm="..."?>
     String signingMethodUri =
         ((signConfiguration.signingMethod != null)
-                && (signConfiguration.signingMethod.toLowerCase().equals("rsa-sha256")))
-            ? "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
-            : "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+                && (signConfiguration.signingMethod.toLowerCase().equals("rsa-sha1")))
+            ? RSA_SHA1
+            : RSA_SHA256;
 
     SignatureMethod signatureMethod = signatureFactory.newSignatureMethod(signingMethodUri, null);
 
@@ -166,7 +165,8 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
     } else if (signConfiguration.keyIdentifierType == KeyIdentifierType.X509_CERT_DIRECT) {
       // <KeyInfo>
       //   <X509Data>
-      //     <X509Certificate>MIICAjCCAWugAw....AQnEdD9tI7IYAAoK4O+35EOzcXbvc4Kzz7BQnulQ=</X509Certificate>
+      //
+      // <X509Certificate>MIICAjCCAWugAw....AQnEdD9tI7IYAAoK4O+35EOzcXbvc4Kzz7BQnulQ=</X509Certificate>
       //   </X509Data>
       // </KeyInfo>
       Element x509Data = doc.createElementNS(Namespaces.XMLDSIG, "X509Data");
@@ -199,7 +199,7 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
     return new String(baos.toByteArray(), StandardCharsets.UTF_8);
   }
 
-  private static RSAPrivateKey readKey(String privateKeyPemString, String password)
+  private static RSAPrivateKey decodeKey(String privateKeyPemString, String password)
       throws IOException, OperatorCreationException, PKCSException, InvalidKeySpecException,
           NoSuchAlgorithmException {
     if (privateKeyPemString == null) {
@@ -273,13 +273,14 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
     privateKeyPemString = reformIndents(privateKeyPemString);
     String privateKeyPassword = getSimpleOptionalProperty("private-key-password", msgCtxt);
     if (privateKeyPassword == null) privateKeyPassword = "";
-    return readKey(privateKeyPemString, privateKeyPassword);
+    return decodeKey(privateKeyPemString, privateKeyPassword);
   }
 
   protected X509Certificate getCertificate(MessageContext msgCtxt)
       throws NoSuchAlgorithmException, InvalidNameException, KeyException,
           CertificateEncodingException {
-    String certificateString = getSimpleRequiredProperty("certificate", msgCtxt);
+    String certificateString = getSimpleOptionalProperty("certificate", msgCtxt);
+    if (certificateString == null) return null;
     certificateString = certificateString.trim();
     X509Certificate certificate = (X509Certificate) certificateFromPEM(certificateString);
     X500Principal principal = certificate.getIssuerX500Principal();
@@ -288,66 +289,13 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
     return certificate;
   }
 
-  private String getSigningMethod(MessageContext msgCtxt) throws Exception {
-    String signingMethod = getSimpleOptionalProperty("signing-method", msgCtxt);
-    if (signingMethod == null) return null;
-    signingMethod = signingMethod.trim();
-    // warn on invalid values
-    if (!signingMethod.toLowerCase().equals("rsa-sha1")
-        && !signingMethod.toLowerCase().equals("rsa-sha256")) {
-      msgCtxt.setVariable(varName("WARNING"), "invalid value for signing-method");
-    }
-    return signingMethod;
-  }
-
-  private String getDigestMethod(MessageContext msgCtxt) throws Exception {
-    String digestMethod = getSimpleOptionalProperty("digest-method", msgCtxt);
-    if (digestMethod == null) return null;
-    digestMethod = digestMethod.trim();
-    // warn on invalid values
-    if (!digestMethod.toLowerCase().equals("sha1")
-        && !digestMethod.toLowerCase().equals("sha256")) {
-      msgCtxt.setVariable(varName("WARNING"), "invalid value for digest-method");
-    }
-    return digestMethod;
-  }
-
-  enum KeyIdentifierType {
-    NOT_SPECIFIED,
-    X509_CERT_DIRECT,
-    RSA_KEY_VALUE;
-    // THUMBPRINT,
-    // BST_DIRECT_REFERENCE,
-    // ISSUER_SERIAL;
-
-    static KeyIdentifierType fromString(String s) {
-      for (KeyIdentifierType t : KeyIdentifierType.values()) {
-        if (t.name().equals(s)) return t;
-      }
-      return KeyIdentifierType.NOT_SPECIFIED;
-    }
-  }
-
-  private KeyIdentifierType getKeyIdentifierType(MessageContext msgCtxt) throws Exception {
-    String kitString = getSimpleOptionalProperty("key-identifier-type", msgCtxt);
-    if (kitString == null) return KeyIdentifierType.RSA_KEY_VALUE;
-    kitString = kitString.trim().toUpperCase();
-    KeyIdentifierType t = KeyIdentifierType.fromString(kitString);
-    if (t == KeyIdentifierType.NOT_SPECIFIED) {
-      msgCtxt.setVariable(varName("warning"), "unrecognized key-identifier-type");
-      return KeyIdentifierType.RSA_KEY_VALUE;
-    }
-    return t;
-  }
-
   static class SignConfiguration {
     public RSAPrivateKey privatekey; // required
     public X509Certificate certificate; // required
     public String signingMethod;
     public String digestMethod;
-    public IssuerNameStyle issuerNameStyle;
+    // public IssuerNameStyle issuerNameStyle;
     public KeyIdentifierType keyIdentifierType;
-    public List<String> elementsToSign;
 
     public SignConfiguration() {
       keyIdentifierType = KeyIdentifierType.RSA_KEY_VALUE;
@@ -363,10 +311,10 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
       return this;
     }
 
-    public SignConfiguration withIssuerNameStyle(IssuerNameStyle ins) {
-      this.issuerNameStyle = ins;
-      return this;
-    }
+    // public SignConfiguration withIssuerNameStyle(IssuerNameStyle ins) {
+    //   this.issuerNameStyle = ins;
+    //   return this;
+    // }
 
     public SignConfiguration withCertificate(X509Certificate certificate) {
       this.certificate = certificate;
@@ -382,11 +330,6 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
       this.digestMethod = digestMethod;
       return this;
     }
-
-    public SignConfiguration withElementsToSign(List<String> elementsToSign) {
-      this.elementsToSign = elementsToSign;
-      return this;
-    }
   }
 
   public ExecutionResult execute(final MessageContext msgCtxt, final ExecutionContext execContext) {
@@ -396,6 +339,7 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
           new SignConfiguration()
               .withKey(getPrivateKey(msgCtxt))
               .withKeyIdentifierType(getKeyIdentifierType(msgCtxt))
+              .withCertificate(getCertificate(msgCtxt))
               .withSigningMethod(getSigningMethod(msgCtxt))
               .withDigestMethod(getDigestMethod(msgCtxt));
 

@@ -1,4 +1,4 @@
-// Copyright 2018-2021 Google LLC
+// Copyright 2018-2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,13 +24,13 @@ import java.io.StringReader;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
+import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Map;
 import javax.xml.crypto.KeySelector;
-import javax.xml.crypto.MarshalException;
+import javax.xml.crypto.dsig.DigestMethod;
 import javax.xml.crypto.dsig.XMLSignature;
-import javax.xml.crypto.dsig.XMLSignatureException;
 import javax.xml.crypto.dsig.XMLSignatureFactory;
 import javax.xml.crypto.dsig.dom.DOMValidateContext;
 import org.bouncycastle.asn1.pkcs.RSAPublicKey;
@@ -46,7 +46,7 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
     super(properties);
   }
 
-  private static PublicKey readPublicKey(String publicKeyPemString)
+  private static PublicKey decodePublicKey(String publicKeyPemString)
       throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
     PEMParser pr = new PEMParser(new StringReader(publicKeyPemString));
     Object o = pr.readObject();
@@ -65,33 +65,143 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
   }
 
   private PublicKey getPublicKey(MessageContext msgCtxt) throws Exception {
-    String publicKeyPemString = getSimpleRequiredProperty("public-key", msgCtxt);
+    String publicKeyPemString = getSimpleOptionalProperty("public-key", msgCtxt);
+    if (publicKeyPemString == null) return null;
     publicKeyPemString = publicKeyPemString.trim();
 
     // clear any leading whitespace on each line
     publicKeyPemString = publicKeyPemString.replaceAll("([\\r|\\n] +)", "\n");
-    return readPublicKey(publicKeyPemString);
+    return decodePublicKey(publicKeyPemString);
   }
 
-  private static boolean validate_RSA_SHA256(Document doc, PublicKey publicKey)
-      throws MarshalException, XMLSignatureException {
-    NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
-    if (nl.getLength() == 0) {
-      throw new RuntimeException("Couldn't find 'Signature' element");
+  private String getCertificateThumbprint(MessageContext msgCtxt) throws Exception {
+    String thumbprint = getSimpleOptionalProperty("certificate-thumbprint", msgCtxt);
+    if (thumbprint == null) return null;
+    thumbprint = thumbprint.trim();
+    return thumbprint;
+  }
+
+  private static Element getXmlDsigElementByPath(Element subtreeRoot, String path)
+      throws Exception {
+    String[] parts = path.split("/");
+    Element currentElement = subtreeRoot;
+    for (int i = 0; i < parts.length; i++) {
+      NodeList nl = currentElement.getElementsByTagNameNS(XMLSignature.XMLNS, parts[i]);
+      if (nl.getLength() == 0) {
+        throw new RuntimeException(String.format("Couldn't find '%s' element", parts[i]));
+      }
+      currentElement = (Element) nl.item(0);
     }
-    Element element = (Element) nl.item(0);
+    return currentElement;
+  }
+
+  private static boolean validate_RSA(Document doc, ValidateConfiguration config) throws Exception {
+
+    // Validate just the first signature. Will not handle multiple
+    // distinct signatures.
+    Element signatureElement = getXmlDsigElementByPath(doc.getDocumentElement(), "Signature");
+
+    if ((config.signingMethod != null) || (config.digestMethod != null)) {
+      Element signedInfo = getXmlDsigElementByPath(signatureElement, "SignedInfo");
+      if (config.signingMethod != null) {
+        Element signatureMethod = getXmlDsigElementByPath(signedInfo, "SignatureMethod");
+        String algorithm = signatureMethod.getAttribute("Algorithm");
+        if ((config.signingMethod.equals("rsa-sha1") && !RSA_SHA1.equals(algorithm))
+            || (config.signingMethod.equals("rsa-sha256") && !RSA_SHA256.equals(algorithm))) {
+          throw new RuntimeException("Unacceptable SignatureMethod Algorithm");
+        }
+      }
+
+      if (config.digestMethod != null) {
+        Element digestMethod = getXmlDsigElementByPath(signedInfo, "Reference/DigestMethod");
+        String algorithm = digestMethod.getAttribute("Algorithm");
+        if ((config.digestMethod.equals("sha1") && !DigestMethod.SHA1.equals(algorithm))
+            || (config.digestMethod.equals("sha256") && !DigestMethod.SHA256.equals(algorithm))) {
+          throw new RuntimeException("Unacceptable DigestMethod Algorithm");
+        }
+      }
+    }
+    PublicKey publicKey = null;
+    if (config.keyIdentifierType == KeyIdentifierType.X509_CERT_DIRECT) {
+      // obtain public key from cert at this xpath: Signature/KeyInfo/X509Data/X509Certificate
+      Element x509CertElement =
+          getXmlDsigElementByPath(signatureElement, "KeyInfo/X509Data/X509Certificate");
+
+      String certString =
+          "-----BEGIN CERTIFICATE-----\n"
+              + x509CertElement.getTextContent()
+              + "\n-----END CERTIFICATE-----";
+
+      X509Certificate embeddedCertificate = (X509Certificate) certificateFromPEM(certString);
+      String thumbprint_sha1 = getThumbprintHex(embeddedCertificate);
+      if (!thumbprint_sha1.equals(config.certificateThumbprint_sha1)) {
+        throw new RuntimeException("Untrusted thumbprint on certificate");
+      }
+      publicKey = embeddedCertificate.getPublicKey();
+    } else {
+      // KeyIdentifierType.RSA_KEY_VALUE
+      if (config.publicKey == null) {
+          throw new IllegalStateException("the configuration does not supply a public key");
+      }
+      publicKey = config.publicKey;
+    }
     KeySelector ks = KeySelector.singletonKeySelector(publicKey);
-    DOMValidateContext vc = new DOMValidateContext(ks, element);
+    DOMValidateContext vc = new DOMValidateContext(ks, signatureElement);
     XMLSignatureFactory signatureFactory = XMLSignatureFactory.getInstance("DOM");
     XMLSignature signature = signatureFactory.unmarshalXMLSignature(vc);
     return signature.validate(vc);
   }
 
+  static class ValidateConfiguration {
+    public PublicKey publicKey;
+    public String certificateThumbprint_sha1;
+    public String signingMethod;
+    public String digestMethod;
+    public KeyIdentifierType keyIdentifierType;
+
+    public ValidateConfiguration() {
+      keyIdentifierType = KeyIdentifierType.RSA_KEY_VALUE;
+    }
+
+    public ValidateConfiguration withKey(PublicKey key) {
+      this.publicKey = key;
+      return this;
+    }
+
+    public ValidateConfiguration withKeyIdentifierType(KeyIdentifierType kit) {
+      this.keyIdentifierType = kit;
+      return this;
+    }
+
+    public ValidateConfiguration withCertificateThumbprint(String certificateThumbprint) {
+      this.certificateThumbprint_sha1 = certificateThumbprint;
+      return this;
+    }
+
+    public ValidateConfiguration withSigningMethod(String signingMethod) {
+      this.signingMethod = signingMethod;
+      return this;
+    }
+
+    public ValidateConfiguration withDigestMethod(String digestMethod) {
+      this.digestMethod = digestMethod;
+      return this;
+    }
+  }
+
   public ExecutionResult execute(final MessageContext msgCtxt, final ExecutionContext execContext) {
     try {
       Document document = getDocument(msgCtxt);
+      ValidateConfiguration validateConfiguration =
+          new ValidateConfiguration()
+              .withKeyIdentifierType(getKeyIdentifierType(msgCtxt))
+              .withKey(getPublicKey(msgCtxt))
+              .withCertificateThumbprint(getCertificateThumbprint(msgCtxt))
+              .withSigningMethod(getSigningMethod(msgCtxt))
+              .withDigestMethod(getDigestMethod(msgCtxt));
+
       PublicKey publicKey = getPublicKey(msgCtxt);
-      boolean isValid = validate_RSA_SHA256(document, publicKey);
+      boolean isValid = validate_RSA(document, validateConfiguration);
       msgCtxt.setVariable(varName("valid"), isValid);
       return ExecutionResult.SUCCESS;
     } catch (IllegalStateException exc1) {

@@ -1,4 +1,4 @@
-<ProxyEndpoint name='endpoint1'>
+<ProxyEndpoint name="endpoint1">
   <Description>Proxy for Java callout for XML Digital Signature</Description>
   <HTTPProxyConnection>
     <BasePath>/xmldsig</BasePath>
@@ -7,21 +7,35 @@
   </HTTPProxyConnection>
 
   <FaultRules/>
+  <DefaultFaultRule>
+    <AlwaysEnforce>true</AlwaysEnforce>
+    <Step>
+      <Name>AM-Inject-Proxy-Revision-Header</Name>
+    </Step>
+  </DefaultFaultRule>
 
   <PreFlow name="PreFlow">
-      <Request/>
-      <Response>
-      </Response>
+    <Request/>
+    <Response>
+
+      <Step>
+        <Name>AM-Clean-Request-Headers-From-Response</Name>
+      </Step>
+    </Response>
   </PreFlow>
 
   <PostFlow name="PostFlow">
-      <Request/>
-      <Response>
-      </Response>
+    <Request/>
+    <Response>
+
+      <Step>
+        <Name>AM-Inject-Proxy-Revision-Header</Name>
+      </Step>
+    </Response>
   </PostFlow>
 
   <Flows>
-    <Flow name='sign1'>
+    <Flow name="sign1">
       <Request>
         <Step>
           <Condition>NOT((request.header.content-type =| "text/xml") OR (request.header.content-type =| "application/xml" ))</Condition>
@@ -29,14 +43,20 @@
         </Step>
       </Request>
       <Response>
-        <Step><Name>AM-PrivateKey1</Name></Step>
-        <Step><Name>Java-XMLDSIG-Sign</Name></Step>
-        <Step><Name>AM-SignatureResponse</Name></Step>
+        <Step>
+          <Name>AM-PrivateKey1</Name>
+        </Step>
+        <Step>
+          <Name>Java-XMLDSIG-Sign</Name>
+        </Step>
+        <Step>
+          <Name>AM-SignatureResponse</Name>
+        </Step>
       </Response>
       <Condition>(proxy.pathsuffix ~ "/sign1") and (request.verb = "POST")</Condition>
     </Flow>
 
-    <Flow name='sign2'>
+    <Flow name="sign2">
       <Request>
         <Step>
           <Condition>NOT((request.header.content-type =| "text/xml") OR (request.header.content-type =| "application/xml" ))</Condition>
@@ -44,14 +64,20 @@
         </Step>
       </Request>
       <Response>
-        <Step><Name>AM-PrivateKey2</Name></Step>
-        <Step><Name>Java-XMLDSIG-Sign</Name></Step>
-        <Step><Name>AM-SignatureResponse</Name></Step>
+        <Step>
+          <Name>AM-PrivateKey2</Name>
+        </Step>
+        <Step>
+          <Name>Java-XMLDSIG-Sign</Name>
+        </Step>
+        <Step>
+          <Name>AM-SignatureResponse</Name>
+        </Step>
       </Response>
       <Condition>(proxy.pathsuffix ~ "/sign2") and (request.verb = "POST")</Condition>
     </Flow>
 
-    <Flow name='validate1'>
+    <Flow name="validate1">
       <Request>
         <Step>
           <Condition>NOT((request.header.content-type =| "text/xml") OR (request.header.content-type =| "application/xml" ))</Condition>
@@ -59,14 +85,20 @@
         </Step>
       </Request>
       <Response>
-        <Step><Name>AM-PublicKey1</Name></Step>
-        <Step><Name>Java-XMLDSIG-Validate</Name></Step>
-        <Step><Name>AM-ValidationResponse</Name></Step>
+        <Step>
+          <Name>AM-PublicKey1</Name>
+        </Step>
+        <Step>
+          <Name>Java-XMLDSIG-Validate</Name>
+        </Step>
+        <Step>
+          <Name>AM-ValidationResponse</Name>
+        </Step>
       </Response>
       <Condition>(proxy.pathsuffix ~ "/validate1") and (request.verb = "POST")</Condition>
     </Flow>
 
-    <Flow name='validate2'>
+    <Flow name="validate2">
       <Request>
         <Step>
           <Condition>NOT((request.header.content-type =| "text/xml") OR (request.header.content-type =| "application/xml" ))</Condition>
@@ -74,29 +106,32 @@
         </Step>
       </Request>
       <Response>
-        <Step><Name>AM-PublicKey2</Name></Step>
-        <Step><Name>Java-XMLDSIG-Validate</Name></Step>
-        <Step><Name>AM-ValidationResponse</Name></Step>
+        <Step>
+          <Name>AM-PublicKey2</Name>
+        </Step>
+        <Step>
+          <Name>Java-XMLDSIG-Validate</Name>
+        </Step>
+        <Step>
+          <Name>AM-ValidationResponse</Name>
+        </Step>
       </Response>
       <Condition>(proxy.pathsuffix ~ "/validate2") and (request.verb = "POST")</Condition>
     </Flow>
 
-    <Flow name='unknown'>
-      <!--
-           applies as a "default" flow, in case none of the conditions
-           for the above flows evaluated to true.
-      -->
+    <Flow name="unknown">
       <Description>Unknown request</Description>
       <Request>
-        <Step><Name>RaiseFault-UnknownRequest</Name></Step>
+        <Step>
+          <Name>RaiseFault-UnknownRequest</Name>
+        </Step>
       </Request>
       <Response/>
     </Flow>
 
   </Flows>
 
-  <RouteRule name='LoopbackRoute'>
-    <!-- no target! no backend call -->
+  <RouteRule name="LoopbackRoute">
   </RouteRule>
 
 </ProxyEndpoint>
