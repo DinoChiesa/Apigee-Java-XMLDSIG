@@ -4,5 +4,5 @@
     <Property name='public-key'>{my_public_key}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220916.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20220919.jar</ResourceURL>
 </JavaCallout>

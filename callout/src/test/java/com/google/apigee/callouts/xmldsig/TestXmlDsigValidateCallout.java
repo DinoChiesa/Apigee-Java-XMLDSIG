@@ -310,23 +310,23 @@ public class TestXmlDsigValidateCallout extends TestBase {
 
   @Test
   public void disallowedTransform() throws Exception {
+    String expectedError = "Couldn't find 'Signature' element";
     msgCtxt.setVariable("message.content", signedXml2);
 
     Map<String, String> props = new HashMap<String, String>();
     props.put("source", "message.content");
+    props.put("debug", "true");
     props.put("public-key", publicKey1);
 
     Validate callout = new Validate(props);
 
     // execute and retrieve output
     ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
-    Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
+    Assert.assertEquals(actualResult, ExecutionResult.ABORT, "result not as expected");
     Object errorOutput = msgCtxt.getVariable("xmldsig_error");
-    Assert.assertNull(errorOutput, "errorOutput");
-    Object exception = msgCtxt.getVariable("xmldsig_exception");
-    Assert.assertNull(exception, "disallowedTransform() exception");
-    Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
-    Assert.assertNull(stacktrace, "disallowedTransform() stacktrace");
+    Assert.assertNotNull(errorOutput, "errorOutput");
+    Assert.assertEquals(errorOutput, expectedError, "error not as expected");
+
     Boolean isValid = (Boolean) msgCtxt.getVariable("xmldsig_valid");
     Assert.assertFalse(isValid, "disallowedTransform() valid");
     System.out.println("=========================================================");
@@ -434,6 +434,9 @@ public class TestXmlDsigValidateCallout extends TestBase {
     Assert.assertNull(stacktrace, "embeddedCert() stacktrace");
     Boolean isValid = (Boolean) msgCtxt.getVariable("xmldsig_valid");
     Assert.assertTrue(isValid, "embeddedCert() valid");
+
+    String notBefore = (String) msgCtxt.getVariable("xmldsig_cert-notBefore");
+    Assert.assertEquals("2022-09-16T22:36:35Z", notBefore);
     System.out.println("=========================================================");
   }
 

@@ -64,7 +64,7 @@ Configure the policy this way:
     <Property name='private-key-password'>{my_private_key_password}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Sign</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220916.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20220919.jar</ResourceURL>
 </JavaCallout>
 ```
 
@@ -86,16 +86,31 @@ The available properties for signing are:
 
 ### Validating
 
-Configure the policy this way:
+If you have a public key, configure the policy this way:
 
 ```xml
 <JavaCallout name='Java-XMLDSIG-Validate'>
   <Properties>
     <Property name='source'>message.content</Property>
+    <Property name='key-identifier-type'>RSA_KEY_VALUE</Property>
     <Property name='public-key'>{my_public_key}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220916.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20220919.jar</ResourceURL>
+</JavaCallout>
+```
+
+if you want to validate the signature using a certificate that is embedded within the signed document, configure the policy this way:
+
+```xml
+<JavaCallout name='Java-XMLDSIG-Validate'>
+  <Properties>
+    <Property name='source'>message.content</Property>
+    <Property name='key-identifier-type'>X509_CERT_DIRECT</property>
+    <Property name='certificate-thumbprint'>{sha1-thumbprint-of-acceptable-cert}</Property>
+  </Properties>
+  <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
+  <ResourceURL>java://apigee-xmldsig-20220919.jar</ResourceURL>
 </JavaCallout>
 ```
 
@@ -107,8 +122,8 @@ The available properties for validating are:
 | `signing-method` | optional. Either `rsa-sha1` or `rsa-sha256`. If set, checks that the signature uses this signing method. |
 | `digest-method` | optional. Either `sha1` or `sha256`. If set, checks that the signature uses this digest method. |
 | `public-key`      | optional. the PEM-encoded RSA public key. You can use a variable reference here as shown above. |
-| `key-identifier-type` | optional. Either `RSA_KEY_VALUE` or `X509_CERT_DIRECT`. Defaults to `RSA_KEY_VALUE`. If you specify  `X509_CERT_DIRECT`, the policy will extract the certificate from the signed document, and extract the public key from that certificate. You must set `certificate-thumbprint` in this case, to the SHA-1 thumbprint of the trusted certificate. This policy does not check validity of the certificate. |
-| `certificate-thumbprint` | optional. the SHA-1 thumbprint of the certificate that is trusted. Used only when `key-identifier-type` is `X509_CERT_DIRECT`. |
+| `key-identifier-type` | optional. Either `RSA_KEY_VALUE` or `X509_CERT_DIRECT`. Defaults to `RSA_KEY_VALUE`. If you specify  `X509_CERT_DIRECT`, the policy will extract the certificate from the signed document, and extract the public key from that certificate. You must set `certificate-thumbprint` in this case, to the SHA-1 thumbprint of the trusted certificate. This policy checks the validity of the certificate - that "right now" is before the certificate notAfter date, and  after the notBefore date. |
+| `certificate-thumbprint` | optional. a comma-separated list of acceptable SHA-1 thumbprints of the certificates that are trusted. Used only when `key-identifier-type` is `X509_CERT_DIRECT`. |
 | `reform-signedinfo`      | optional. Specify `true` to tell the validating callout to reform the `SignedInfo` element to remove spaces and newlines, before validating the signature. |
 
 The result of the Validate callout is to set a single variable: xmldsig_valid.  It takes a true value if the signature was valid; false otherwise. You can use a Condition in your Proxy flow to examine that result.
@@ -327,8 +342,7 @@ sub-tree! It works only on the `SignedInfo` element.
 To avoid all of this, do not modify the signed document before validation.
 
 
-None reported.
-
 ## Bugs
 
 None reported.
+

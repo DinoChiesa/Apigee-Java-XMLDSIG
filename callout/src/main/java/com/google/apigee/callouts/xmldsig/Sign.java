@@ -180,6 +180,9 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
       javax.xml.crypto.XMLStructure structure = new javax.xml.crypto.dom.DOMStructure(x509Data);
       keyInfo = kif.newKeyInfo(java.util.Collections.singletonList(structure));
     }
+    else {
+      throw new IllegalStateException("unsupported KeyInfo format");
+    }
 
     // DOMSignContext signingContext = new DOMSignContext(signConfiguration.privatekey,
     // wssecHeader);

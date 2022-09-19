@@ -24,10 +24,16 @@ import java.io.StringReader;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.RSAPublicKeySpec;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.xml.crypto.KeySelector;
 import javax.xml.crypto.dsig.DigestMethod;
 import javax.xml.crypto.dsig.XMLSignature;
@@ -38,7 +44,7 @@ import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
+import org.w3c.dom.Node;
 
 public class Validate extends XmlDsigCalloutBase implements Execution {
 
@@ -74,11 +80,25 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
     return decodePublicKey(publicKeyPemString);
   }
 
-  private String getCertificateThumbprint(MessageContext msgCtxt) throws Exception {
-    String thumbprint = getSimpleOptionalProperty("certificate-thumbprint", msgCtxt);
-    if (thumbprint == null) return null;
-    thumbprint = thumbprint.trim();
-    return thumbprint;
+  private List<String> getCertificateThumbprints(MessageContext msgCtxt) throws Exception {
+    String nameList = getSimpleOptionalProperty("certificate-thumbprint", msgCtxt);
+    if (nameList == null) return null;
+    nameList = nameList.trim();
+    return Arrays.asList(nameList.split(",[ ]*")).stream()
+        .map(String::toLowerCase)
+        .collect(Collectors.toList());
+  }
+
+  private static Element getChildByTagNameNS(
+      Element parent, String targetNodeName, String targetNodeNS) {
+    for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+      if (child instanceof Element
+          && targetNodeName.equals(child.getNodeName())
+          && targetNodeNS.equals(child.getNamespaceURI())) {
+        return (Element) child;
+      }
+    }
+    return null;
   }
 
   private static Element getXmlDsigElementByPath(Element subtreeRoot, String path)
@@ -86,23 +106,42 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
     String[] parts = path.split("/");
     Element currentElement = subtreeRoot;
     for (int i = 0; i < parts.length; i++) {
-      NodeList nl = currentElement.getElementsByTagNameNS(XMLSignature.XMLNS, parts[i]);
-      if (nl.getLength() == 0) {
+      // NodeList nl = currentElement.getElementsByTagNameNS(XMLSignature.XMLNS, parts[i]);
+      // if (nl.getLength() == 0) {
+      //   throw new RuntimeException(String.format("Couldn't find '%s' element", parts[i]));
+      // }
+      // currentElement = (Element) nl.item(0);
+
+      currentElement = getChildByTagNameNS(currentElement, parts[i], XMLSignature.XMLNS);
+      if (currentElement == null) {
         throw new RuntimeException(String.format("Couldn't find '%s' element", parts[i]));
       }
-      currentElement = (Element) nl.item(0);
     }
     return currentElement;
   }
 
-  private static boolean validate_RSA(Document doc, ValidateConfiguration config) throws Exception {
+  private static boolean validate_RSA(
+      Document doc, ValidateConfiguration config, MessageContext msgCtxt) throws Exception {
 
     // Validate just the first signature. Will not handle multiple
     // distinct signatures.
     Element signatureElement = getXmlDsigElementByPath(doc.getDocumentElement(), "Signature");
 
+    Element signedInfo = getXmlDsigElementByPath(signatureElement, "SignedInfo");
+
+    // check that the signature applies to the root element
+    Element reference = getXmlDsigElementByPath(signedInfo, "Reference");
+    String referenceURI = reference.getAttribute("URI");
+    if (referenceURI == null) {
+      throw new RuntimeException(
+          "Invalid signature. There is no URI attribute on the Reference element.");
+    }
+    if (!"".equals(referenceURI)) {
+      throw new RuntimeException(
+          "Invalid signature. The signature does not apply to the root element.");
+    }
+
     if ((config.signingMethod != null) || (config.digestMethod != null)) {
-      Element signedInfo = getXmlDsigElementByPath(signatureElement, "SignedInfo");
       if (config.signingMethod != null) {
         Element signatureMethod = getXmlDsigElementByPath(signedInfo, "SignatureMethod");
         String algorithm = signatureMethod.getAttribute("Algorithm");
@@ -133,15 +172,36 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
               + "\n-----END CERTIFICATE-----";
 
       X509Certificate embeddedCertificate = (X509Certificate) certificateFromPEM(certString);
+      try {
+        // check notBefore and notAfter dates
+        embeddedCertificate.checkValidity();
+      } catch (CertificateExpiredException cee) {
+        throw new RuntimeException("The embedded certificate is expired.");
+      } catch (CertificateNotYetValidException cnyve) {
+        throw new RuntimeException("The embedded certificate is not yet valid.");
+      }
+      // emit some information about the embedded certificate into the message context
+      msgCtxt.setVariable(
+          varName("cert-notAfter"),
+          DateTimeFormatter.ISO_INSTANT.format(embeddedCertificate.getNotAfter().toInstant()));
+      msgCtxt.setVariable(
+          varName("cert-notBefore"),
+          DateTimeFormatter.ISO_INSTANT.format(embeddedCertificate.getNotBefore().toInstant()));
+      msgCtxt.setVariable(
+          varName("cert-subject-cn"), getCommonName(embeddedCertificate.getSubjectX500Principal()));
+      msgCtxt.setVariable(
+          varName("cert-issuer-cn"), getCommonName(embeddedCertificate.getIssuerX500Principal()));
       String thumbprint_sha1 = getThumbprintHex(embeddedCertificate);
-      if (!thumbprint_sha1.equals(config.certificateThumbprint_sha1)) {
+      msgCtxt.setVariable(varName("cert-sha1-thumbprint"), thumbprint_sha1);
+
+      if (!config.acceptableCertificateThumbprints_sha1.contains(thumbprint_sha1)) {
         throw new RuntimeException("Untrusted thumbprint on certificate");
       }
       publicKey = embeddedCertificate.getPublicKey();
     } else {
       // KeyIdentifierType.RSA_KEY_VALUE
       if (config.publicKey == null) {
-          throw new IllegalStateException("the configuration does not supply a public key");
+        throw new IllegalStateException("the configuration does not supply a public key");
       }
       publicKey = config.publicKey;
     }
@@ -154,7 +214,7 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
 
   static class ValidateConfiguration {
     public PublicKey publicKey;
-    public String certificateThumbprint_sha1;
+    public List<String> acceptableCertificateThumbprints_sha1;
     public String signingMethod;
     public String digestMethod;
     public KeyIdentifierType keyIdentifierType;
@@ -173,8 +233,8 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
       return this;
     }
 
-    public ValidateConfiguration withCertificateThumbprint(String certificateThumbprint) {
-      this.certificateThumbprint_sha1 = certificateThumbprint;
+    public ValidateConfiguration withCertificateThumbprints(List<String> certificateThumbprints) {
+      this.acceptableCertificateThumbprints_sha1 = certificateThumbprints;
       return this;
     }
 
@@ -191,17 +251,18 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
 
   public ExecutionResult execute(final MessageContext msgCtxt, final ExecutionContext execContext) {
     try {
+      msgCtxt.setVariable(varName("valid"), false);
       Document document = getDocument(msgCtxt);
       ValidateConfiguration validateConfiguration =
           new ValidateConfiguration()
               .withKeyIdentifierType(getKeyIdentifierType(msgCtxt))
               .withKey(getPublicKey(msgCtxt))
-              .withCertificateThumbprint(getCertificateThumbprint(msgCtxt))
+              .withCertificateThumbprints(getCertificateThumbprints(msgCtxt))
               .withSigningMethod(getSigningMethod(msgCtxt))
               .withDigestMethod(getDigestMethod(msgCtxt));
 
       PublicKey publicKey = getPublicKey(msgCtxt);
-      boolean isValid = validate_RSA(document, validateConfiguration);
+      boolean isValid = validate_RSA(document, validateConfiguration, msgCtxt);
       msgCtxt.setVariable(varName("valid"), isValid);
       return ExecutionResult.SUCCESS;
     } catch (IllegalStateException exc1) {
