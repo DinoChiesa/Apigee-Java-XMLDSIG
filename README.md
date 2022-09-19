@@ -64,7 +64,7 @@ Configure the policy this way:
     <Property name='private-key-password'>{my_private_key_password}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Sign</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220919.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20220919a.jar</ResourceURL>
 </JavaCallout>
 ```
 
@@ -96,7 +96,7 @@ If you have a public key, configure the policy this way:
     <Property name='public-key'>{my_public_key}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220919.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20220919a.jar</ResourceURL>
 </JavaCallout>
 ```
 
@@ -110,21 +110,22 @@ if you want to validate the signature using a certificate that is embedded withi
     <Property name='certificate-thumbprint'>{sha1-thumbprint-of-acceptable-cert}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220919.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20220919a.jar</ResourceURL>
 </JavaCallout>
 ```
 
 The available properties for validating are:
 
-| name            | description |
-| --------------- | ------------ |
-| `source`          | optional. the variable name in which to obtain the source signed document to validate. Defaults to `message.content` |
+| name             | description |
+| ---------------- | ------------ |
+| `source`         | optional. the variable name in which to obtain the source signed document to validate. Defaults to `message.content` |
 | `signing-method` | optional. Either `rsa-sha1` or `rsa-sha256`. If set, checks that the signature uses this signing method. |
-| `digest-method` | optional. Either `sha1` or `sha256`. If set, checks that the signature uses this digest method. |
-| `public-key`      | optional. the PEM-encoded RSA public key. You can use a variable reference here as shown above. |
+| `digest-method`  | optional. Either `sha1` or `sha256`. If set, checks that the signature uses this digest method. |
+| `public-key`     | optional. the PEM-encoded RSA public key. You can use a variable reference here as shown above. |
 | `key-identifier-type` | optional. Either `RSA_KEY_VALUE` or `X509_CERT_DIRECT`. Defaults to `RSA_KEY_VALUE`. If you specify  `X509_CERT_DIRECT`, the policy will extract the certificate from the signed document, and extract the public key from that certificate. You must set `certificate-thumbprint` in this case, to the SHA-1 thumbprint of the trusted certificate. This policy checks the validity of the certificate - that "right now" is before the certificate notAfter date, and  after the notBefore date. |
-| `certificate-thumbprint` | optional. a comma-separated list of acceptable SHA-1 thumbprints of the certificates that are trusted. Used only when `key-identifier-type` is `X509_CERT_DIRECT`. |
-| `reform-signedinfo`      | optional. Specify `true` to tell the validating callout to reform the `SignedInfo` element to remove spaces and newlines, before validating the signature. |
+| `certificate-thumbprints` | optional. a comma-separated list of acceptable SHA-1 thumbprints of the certificates that are trusted. Don't use this setting, if possible. Instead use the S256 version. This property is used only when `key-identifier-type` is `X509_CERT_DIRECT`. |
+| `certificate-thumbprints-s256` | optional. a comma-separated list of acceptable SHA-256 thumbprints of the certificates that are trusted. This takes precedence over the deprecated `certificate-thumbprints`.  This property is used only when `key-identifier-type` is `X509_CERT_DIRECT`. |
+| `reform-signedinfo`      | optional. Specify `true` to tell the validating callout to reform the `SignedInfo` element to remove spaces and newlines, before validating the signature. Omit this if you'd like to avoid unnecessary busy work. |
 
 The result of the Validate callout is to set a single variable: xmldsig_valid.  It takes a true value if the signature was valid; false otherwise. You can use a Condition in your Proxy flow to examine that result.
 

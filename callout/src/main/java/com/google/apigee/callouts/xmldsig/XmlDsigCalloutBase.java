@@ -295,6 +295,12 @@ public abstract class XmlDsigCalloutBase {
         .toLowerCase();
   }
 
+  protected static String getThumbprintHexSha256(X509Certificate certificate)
+      throws NoSuchAlgorithmException, CertificateEncodingException {
+    return DatatypeConverter.printHexBinary(
+        MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded()));
+  }
+
   // protected static String getThumbprintSha256(X509Certificate certificate)
   //   throws NoSuchAlgorithmException, CertificateEncodingException {
   //   return DatatypeConverter.printHexBinary(

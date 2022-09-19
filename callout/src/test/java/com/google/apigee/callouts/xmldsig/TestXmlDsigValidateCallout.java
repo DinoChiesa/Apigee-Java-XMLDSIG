@@ -226,7 +226,6 @@ public class TestXmlDsigValidateCallout extends TestBase {
     Assert.assertEquals(actualResult, ExecutionResult.ABORT, "result not as expected");
     Object errorOutput = msgCtxt.getVariable("xmldsig_error");
     Assert.assertNotNull(errorOutput, "errorOutput");
-    // System.out.printf("expected error: %s\n", errorOutput);
     Assert.assertEquals(errorOutput, expectedError, "error not as expected");
     Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
     Assert.assertNull(stacktrace, "emptySource() stacktrace");
@@ -252,7 +251,6 @@ public class TestXmlDsigValidateCallout extends TestBase {
     Assert.assertNotNull(exception, "missingPublicKey() exception");
     Object errorOutput = msgCtxt.getVariable("xmldsig_error");
     Assert.assertNotNull(errorOutput, "errorOutput");
-    // System.out.printf("expected error: %s\n", errorOutput);
     Assert.assertEquals(errorOutput, expectedError, "error not as expected");
     Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
     Assert.assertNull(stacktrace, "missingPublicKey() stacktrace");
@@ -277,7 +275,6 @@ public class TestXmlDsigValidateCallout extends TestBase {
     Assert.assertNotNull(exception, "rubbishPublicKey() exception");
     Object errorOutput = msgCtxt.getVariable("xmldsig_error");
     Assert.assertNotNull(errorOutput, "errorOutput");
-    System.out.printf("expected error: %s\n", errorOutput);
     Assert.assertEquals(errorOutput, expectedError, "error not as expected");
     Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
     Assert.assertNull(stacktrace, "rubbishPublicKey() stacktrace");

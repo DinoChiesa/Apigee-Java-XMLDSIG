@@ -81,7 +81,19 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
   }
 
   private List<String> getCertificateThumbprints(MessageContext msgCtxt) throws Exception {
-    String nameList = getSimpleOptionalProperty("certificate-thumbprint", msgCtxt);
+    String nameList = getSimpleOptionalProperty("certificate-thumbprints", msgCtxt);
+    if (nameList == null) {
+       nameList = getSimpleOptionalProperty("certificate-thumbprint", msgCtxt);
+    }
+    if (nameList == null) return null;
+    nameList = nameList.trim();
+    return Arrays.asList(nameList.split(",[ ]*")).stream()
+        .map(String::toLowerCase)
+        .collect(Collectors.toList());
+  }
+
+  private List<String> getCertificateThumbprints_S256(MessageContext msgCtxt) throws Exception {
+    String nameList = getSimpleOptionalProperty("certificate-thumbprints-s256", msgCtxt);
     if (nameList == null) return null;
     nameList = nameList.trim();
     return Arrays.asList(nameList.split(",[ ]*")).stream()
@@ -191,11 +203,25 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
           varName("cert-subject-cn"), getCommonName(embeddedCertificate.getSubjectX500Principal()));
       msgCtxt.setVariable(
           varName("cert-issuer-cn"), getCommonName(embeddedCertificate.getIssuerX500Principal()));
-      String thumbprint_sha1 = getThumbprintHex(embeddedCertificate);
-      msgCtxt.setVariable(varName("cert-sha1-thumbprint"), thumbprint_sha1);
 
-      if (!config.acceptableCertificateThumbprints_sha1.contains(thumbprint_sha1)) {
-        throw new RuntimeException("Untrusted thumbprint on certificate");
+      if (config.acceptableCertificateThumbprints_sha256 != null) {
+        String thumbprint_sha256 = getThumbprintHexSha256(embeddedCertificate);
+        msgCtxt.setVariable(varName("cert-sha256-thumbprint"), thumbprint_sha256);
+
+        if (!config.acceptableCertificateThumbprints_sha256.contains(thumbprint_sha256)) {
+          throw new RuntimeException("Untrusted thumbprint on certificate");
+        }
+      }
+      else if (config.acceptableCertificateThumbprints_sha1 != null) {
+        String thumbprint_sha1 = getThumbprintHex(embeddedCertificate);
+        msgCtxt.setVariable(varName("cert-sha1-thumbprint"), thumbprint_sha1);
+
+        if (!config.acceptableCertificateThumbprints_sha1.contains(thumbprint_sha1)) {
+          throw new RuntimeException("Untrusted thumbprint on certificate");
+        }
+      }
+      else {
+        throw new RuntimeException("No way to validate thumbprint on certificate");
       }
       publicKey = embeddedCertificate.getPublicKey();
     } else {
@@ -215,6 +241,7 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
   static class ValidateConfiguration {
     public PublicKey publicKey;
     public List<String> acceptableCertificateThumbprints_sha1;
+    public List<String> acceptableCertificateThumbprints_sha256;
     public String signingMethod;
     public String digestMethod;
     public KeyIdentifierType keyIdentifierType;
@@ -238,6 +265,11 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
       return this;
     }
 
+    public ValidateConfiguration withCertificateThumbprints_S256(List<String> certificateThumbprints) {
+      this.acceptableCertificateThumbprints_sha256 = certificateThumbprints;
+      return this;
+    }
+
     public ValidateConfiguration withSigningMethod(String signingMethod) {
       this.signingMethod = signingMethod;
       return this;
@@ -258,6 +290,7 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
               .withKeyIdentifierType(getKeyIdentifierType(msgCtxt))
               .withKey(getPublicKey(msgCtxt))
               .withCertificateThumbprints(getCertificateThumbprints(msgCtxt))
+              .withCertificateThumbprints_S256(getCertificateThumbprints_S256(msgCtxt))
               .withSigningMethod(getSigningMethod(msgCtxt))
               .withDigestMethod(getDigestMethod(msgCtxt));
 
