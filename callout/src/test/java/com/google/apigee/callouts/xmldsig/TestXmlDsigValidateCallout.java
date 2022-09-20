@@ -19,6 +19,7 @@ import com.apigee.flow.execution.ExecutionResult;
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 public class TestXmlDsigValidateCallout extends TestBase {
@@ -404,10 +405,49 @@ public class TestXmlDsigValidateCallout extends TestBase {
     System.out.println("=========================================================");
   }
 
-  @Test
-  public void embeddedCert() throws Exception {
-    String signedXml =
-        getResourceFileContents("documents", "signed--key-identifier-x509-cert-direct.xml");
+  @DataProvider(name = "filesWithEmbeddedCert")
+  protected Object[][] getNamesOfSignedFiles() {
+    String[] filenames = new String[] { "signed--key-identifier-x509-cert-direct.xml",
+                                               "signed--key-identifier-x509-cert-direct-and-issuer-serial.xml" };
+    return toDataProvider(filenames);
+  };
+
+
+  @Test(dataProvider="filesWithEmbeddedCert")
+  public void embeddedCert_sha256(int ix, String filename) throws Exception {
+    String signedXml = getResourceFileContents("documents", filename);
+    String trustedThumbprint = "0067b84f4d5f8425888cc28b99238a3c71b5c50274a22d336695f462ffe169ed";
+
+    msgCtxt.setVariable("message.content", signedXml);
+
+    Map<String, String> props = new HashMap<String, String>();
+    props.put("debug", "true");
+    props.put("source", "message.content");
+    props.put("key-identifier-type", "x509_cert_direct");
+    props.put("certificate-thumbprints-s256", trustedThumbprint);
+
+    Validate callout = new Validate(props);
+
+    // execute and retrieve output
+    ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
+    Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
+    Object errorOutput = msgCtxt.getVariable("xmldsig_error");
+    Assert.assertNull(errorOutput, "errorOutput");
+    Object exception = msgCtxt.getVariable("xmldsig_exception");
+    Assert.assertNull(exception, "embeddedCert() exception");
+    Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
+    Assert.assertNull(stacktrace, "embeddedCert() stacktrace");
+    Boolean isValid = (Boolean) msgCtxt.getVariable("xmldsig_valid");
+    Assert.assertTrue(isValid, "embeddedCert() valid");
+
+    String notBefore = (String) msgCtxt.getVariable("xmldsig_cert-notBefore");
+    Assert.assertEquals("2022-09-16T22:36:35Z", notBefore);
+    System.out.println("=========================================================");
+  }
+
+  @Test(dataProvider="filesWithEmbeddedCert")
+  public void embeddedCert_sha1(int ix, String filename) throws Exception {
+    String signedXml = getResourceFileContents("documents", filename);
     String trustedThumbprint = "1043ca08045649e215402ef6c4a77d33190b8c02";
 
     msgCtxt.setVariable("message.content", signedXml);
@@ -416,7 +456,7 @@ public class TestXmlDsigValidateCallout extends TestBase {
     props.put("debug", "true");
     props.put("source", "message.content");
     props.put("key-identifier-type", "x509_cert_direct");
-    props.put("certificate-thumbprint", trustedThumbprint);
+    props.put("certificate-thumbprints", trustedThumbprint);
 
     Validate callout = new Validate(props);
 

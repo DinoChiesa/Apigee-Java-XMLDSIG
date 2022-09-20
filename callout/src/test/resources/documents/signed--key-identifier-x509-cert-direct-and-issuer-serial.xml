@@ -1,0 +1,35 @@
+<purchaseOrder xmlns="http://tempuri.org/po.xsd" orderDate="2017-05-20">
+    <shipTo country="US">
+        <name>Alice Smith</name>
+        <street>123 Maple Street</street>
+        <city>Mill Valley</city>
+        <state>CA</state>
+        <zip>90952</zip>
+    </shipTo>
+    <billTo country="US">
+        <name>Robert Smith</name>
+        <street>8 Oak Avenue</street>
+        <city>Old Town</city>
+        <state>PA</state>
+        <zip>95819</zip>
+    </billTo>
+    <comment>Hurry, my lawn is going wild!</comment>
+    <items>
+        <item partNum="872-AA">
+            <productName>Lawnmower</productName>
+            <quantity>1</quantity>
+            <USPrice>148.95</USPrice>
+            <comment>Confirm this is electric</comment>
+        </item>
+        <item partNum="926-AA">
+            <productName>Baby Monitor</productName>
+            <quantity>1</quantity>
+            <USPrice>39.98</USPrice>
+            <shipDate>2018-05-21</shipDate>
+        </item>
+    </items>
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>O9muM7W0uJVqimvGK83IGR2M4f8=</DigestValue></Reference></SignedInfo><SignatureValue>X7vi38X4+XndQ3vjiOmrpuAAoOaflmg2JAgFkYc6n+4l02I7HRtJSmkN1oU+rs1BsTS74WiRJAvu
+mKvOdSglKbMuL524Bmlyk3gXS6Oo9c7TH76JrQm4UlODq/OPWBIHqemtko16XI9EPS0nL0akjYXz
+TSrzfDd95mvmPzbs8NRz6LjFxccayhu9VVMeIO/12CqVTmoCKjA9njZ8uA5SFb3iRRDrb8gXWBD2
+4ZEQgweMRwtSLMTgJUMf8FliJwLrYkAk2KEhTAch52u8aoO+nWEVbmxCpbNtzB2tenaOf418L4Gv
+/OgBO3yjFXhXIIxQQ3ekXk0LISiRNij5E67WxQ==</SignatureValue><KeyInfo><X509Data><X509IssuerSerial><X509IssuerName>CN=dino.apigee.google.com</X509IssuerName><X509SerialNumber>11603212086698924646</X509SerialNumber></X509IssuerSerial><X509Certificate>MIIDvDCCAqQCCQChBuPqmTVaZjANBgkqhkiG9w0BAQUFADCBnzELMAkGA1UEBhMCVVMxEzARBgNVBAgMCldhc2hpbmd0b24xETAPBgNVBAcMCEtpcmtsYW5kMRMwEQYDVQQKDApHb29nbGUgTExDMQ8wDQYDVQQLDAZBcGlnZWUxHzAdBgNVBAMMFmRpbm8uYXBpZ2VlLmdvb2dsZS5jb20xITAfBgkqhkiG9w0BCQEWEmRjaGllc2FAZ29vZ2xlLmNvbTAeFw0yMjA5MTYyMjM2MzVaFw0zMjA5MTMyMjM2MzVaMIGfMQswCQYDVQQGEwJVUzETMBEGA1UECAwKV2FzaGluZ3RvbjERMA8GA1UEBwwIS2lya2xhbmQxEzARBgNVBAoMCkdvb2dsZSBMTEMxDzANBgNVBAsMBkFwaWdlZTEfMB0GA1UEAwwWZGluby5hcGlnZWUuZ29vZ2xlLmNvbTEhMB8GCSqGSIb3DQEJARYSZGNoaWVzYUBnb29nbGUuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8o+ava559ZpnlgcqYrZntpp5UHMgO47C98xz6TzCQxvQVRWyRC/aIHugv+wIMeJIbGOqgOIh/VgpMaD4FLplgR3/YAOfqdsu/U9CIWvP4yfDXKPltvWnq1uoMpspOSq2QTShPV4TmbUlr1du57xpmnZyBztvH0LAs2tELVybwIsHEY0UveU3MIAgVa9/lKpxDNPMQnkPWj1kgUm5dvSOfF3udjndfn4Z1PUIubZ20IEY8Sc41AqEzGDKr+dtFsVUABQxePafX2qPFsphbf9BjLS0bL5kNueHxbktDrUbppja4doTQaBi8kTws/LYdg72RD1sbcIvXvB8VN19ituYbwIDAQABMA0GCSqGSIb3DQEBBQUAA4IBAQBLfzgXJzZKZOikQi+gS3LZyWLyugnLH52KLRBUzHQLk+MhMpdwIbH2HG5xIAuaBlCFAupGX7TEF9fB/x9FkZnXnY5v5H5vE4JWxZg6Hwm33O4YF0sDZ8FaAcm2OJyYvxt4eENVeYa/nrTxoWYZVYpkLDFVIWWZRo6GnwwldYYBhS2pjask/7IMAcrRiSgpSdfhki2potl/lAm3Sr/fN9h/Xqr02OK/Zedm35szEs9LGqUegG6p7ycL0JjTMgLcAR3HilMAXoGfcnhYL6sGVNQwo8ydmWEs1NNuSlMu7WZjqfZt85D6IUkSC/NpWVrU++WG+p2dvbtMWv3JddtaGksR</X509Certificate></X509Data></KeyInfo></Signature></purchaseOrder>

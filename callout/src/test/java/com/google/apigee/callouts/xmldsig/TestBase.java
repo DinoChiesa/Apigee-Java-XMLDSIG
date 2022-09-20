@@ -22,8 +22,10 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.IntStream;
 import mockit.Mock;
 import mockit.MockUp;
 import org.testng.annotations.BeforeMethod;
@@ -117,5 +119,17 @@ public class TestBase {
     return new String(Files.readAllBytes(path));
   }
 
+  // @DataProvider requires the output to be a Object[][]. The inner
+  // Object[] is the set of params that get passed to the test method.
+  // So, if you want to pass just one param to the constructor, then
+  // each inner Object[] must have length 1.
+
+  protected Object[][] toDataProvider(String[] a) {
+    ArrayList<Object[]> list = new ArrayList<Object[]>();
+
+    IntStream.range(0, a.length)
+      .forEach( i -> list.add(new Object[] { i, a[i] }));
+    return list.toArray(new Object[list.size()][]);
+  }
 
 }

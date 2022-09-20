@@ -26,8 +26,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateFactory;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -45,10 +48,10 @@ import org.w3c.dom.NodeList;
 
 public abstract class XmlDsigCalloutBase {
   private static final String _varprefix = "xmldsig_";
-  private Map properties; // read-only
   private static final String variableReferencePatternString = "(.*?)\\{([^\\{\\} ]+?)\\}(.*?)";
   private static final Pattern variableReferencePattern =
       Pattern.compile(variableReferencePatternString);
+  protected Map properties; // read-only
 
   public static final String RSA_SHA1 = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
   public static final String RSA_SHA256 = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256";
@@ -186,10 +189,11 @@ public abstract class XmlDsigCalloutBase {
   enum KeyIdentifierType {
     NOT_SPECIFIED,
     X509_CERT_DIRECT,
-    RSA_KEY_VALUE;
+    X509_CERT_DIRECT_AND_ISSUER_SERIAL,
     // THUMBPRINT,
     // BST_DIRECT_REFERENCE,
-    // ISSUER_SERIAL;
+    RSA_KEY_VALUE,
+    X509_ISSUER_SERIAL;
 
     static KeyIdentifierType fromString(String s) {
       for (KeyIdentifierType t : KeyIdentifierType.values()) {
@@ -213,18 +217,18 @@ public abstract class XmlDsigCalloutBase {
 
   enum IssuerNameStyle {
     NOT_SPECIFIED,
-    SHORT,
-    SUBJECT_DN
+    COMMON_NAME,
+    DN
   }
 
   protected IssuerNameStyle getIssuerNameStyle(MessageContext msgCtxt) {
-    String kitString = getSimpleOptionalProperty("issuer-name-style", msgCtxt);
-    if (kitString == null) return IssuerNameStyle.SHORT;
-    kitString = kitString.trim().toUpperCase();
-    if (kitString.equals("SHORT")) return IssuerNameStyle.SHORT;
-    if (kitString.equals("SUBJECT_DN")) return IssuerNameStyle.SUBJECT_DN;
+    String insString = getSimpleOptionalProperty("issuer-name-style", msgCtxt);
+    if (insString == null) return IssuerNameStyle.COMMON_NAME;
+    insString = insString.trim().toUpperCase();
+    if (insString.equals("COMMON_NAME")) return IssuerNameStyle.COMMON_NAME;
+    if (insString.equals("DN")) return IssuerNameStyle.DN;
     msgCtxt.setVariable(varName("warning"), "unrecognized issuer-name-style");
-    return IssuerNameStyle.SHORT;
+    return IssuerNameStyle.COMMON_NAME;
   }
 
   protected String getSigningMethod(MessageContext msgCtxt) throws Exception {
@@ -253,6 +257,42 @@ public abstract class XmlDsigCalloutBase {
     return digestMethod;
   }
 
+  protected boolean getOmitCertValidityCheck(MessageContext msgCtxt) throws Exception {
+    String value = (String) this.properties.get("omit-certificate-validity-check");
+    if (value == null) return false;
+    if (value.trim().toLowerCase().equals("true")) return true;
+    return false;
+  }
+
+  protected static void checkCertificateValidity(
+      X509Certificate certificate, MessageContext msgCtxt) {
+    try {
+      // check notBefore and notAfter dates
+      certificate.checkValidity();
+    } catch (CertificateExpiredException cee) {
+      throw new RuntimeException("The embedded certificate is expired.");
+    } catch (CertificateNotYetValidException cnyve) {
+      throw new RuntimeException("The embedded certificate is not yet valid.");
+    }
+  }
+
+  protected static void emitCertificateInformation(
+      X509Certificate certificate, MessageContext msgCtxt) throws InvalidNameException {
+    msgCtxt.setVariable(
+        varName("cert-notAfter"),
+        DateTimeFormatter.ISO_INSTANT.format(certificate.getNotAfter().toInstant()));
+    msgCtxt.setVariable(
+        varName("cert-notBefore"),
+        DateTimeFormatter.ISO_INSTANT.format(certificate.getNotBefore().toInstant()));
+    msgCtxt.setVariable(
+        varName("cert-subject-cn"), getCommonName(certificate.getSubjectX500Principal()));
+    msgCtxt.setVariable(varName("cert-subject"), certificate.getSubjectX500Principal().toString());
+    msgCtxt.setVariable(
+        varName("cert-issuer-cn"), getCommonName(certificate.getIssuerX500Principal()));
+    msgCtxt.setVariable(varName("cert-issuer"), certificate.getIssuerX500Principal().toString());
+    msgCtxt.setVariable(varName("cert-serial"), certificate.getSerialNumber().toString(16));
+  }
+
   protected static String reformIndents(String s) {
     return s.trim().replaceAll("([\\r|\\n|\\r\\n] *)", "\n");
   }
@@ -267,6 +307,11 @@ public abstract class XmlDsigCalloutBase {
       }
     }
     return cn;
+  }
+
+  protected static Certificate certificateFromEncoded(String encoded) throws KeyException {
+    return certificateFromPEM(
+        "-----BEGIN CERTIFICATE-----\n" + encoded + "\n-----END CERTIFICATE-----");
   }
 
   protected static Certificate certificateFromPEM(String certificateString) throws KeyException {
@@ -298,15 +343,9 @@ public abstract class XmlDsigCalloutBase {
   protected static String getThumbprintHexSha256(X509Certificate certificate)
       throws NoSuchAlgorithmException, CertificateEncodingException {
     return DatatypeConverter.printHexBinary(
-        MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded()));
+        MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded()))
+        .toLowerCase();
   }
-
-  // protected static String getThumbprintSha256(X509Certificate certificate)
-  //   throws NoSuchAlgorithmException, CertificateEncodingException {
-  //   return DatatypeConverter.printHexBinary(
-  //       MessageDigest.getInstance("SHA-256").digest(
-  //               certificate.getEncoded())).toLowerCase();
-  // }
 
   protected static String getStackTraceAsString(Throwable t) {
     StringWriter sw = new StringWriter();

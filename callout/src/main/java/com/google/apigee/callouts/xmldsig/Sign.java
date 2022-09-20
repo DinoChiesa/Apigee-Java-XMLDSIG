@@ -19,6 +19,8 @@ import com.apigee.flow.execution.ExecutionContext;
 import com.apigee.flow.execution.ExecutionResult;
 import com.apigee.flow.execution.spi.Execution;
 import com.apigee.flow.message.MessageContext;
+import com.google.apigee.util.ThrowingSideEffect;
+import com.google.apigee.util.ThrowingSupplier;
 import com.google.apigee.xml.Namespaces;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -38,6 +40,8 @@ import java.util.Map;
 import javax.naming.InvalidNameException;
 import javax.security.auth.x500.X500Principal;
 import javax.xml.crypto.MarshalException;
+import javax.xml.crypto.XMLStructure;
+import javax.xml.crypto.dom.DOMStructure;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
 import javax.xml.crypto.dsig.DigestMethod;
 import javax.xml.crypto.dsig.Reference;
@@ -79,15 +83,44 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
     super(properties);
   }
 
-  private static String sign_RSA(Document doc, SignConfiguration signConfiguration)
+  private static String sign_RSA(Document doc, SignConfiguration config, MessageContext msgCtxt)
       throws InstantiationException, NoSuchAlgorithmException, InvalidAlgorithmParameterException,
           KeyException, MarshalException, XMLSignatureException, TransformerException,
-          CertificateEncodingException {
+          CertificateEncodingException, InvalidNameException {
     XMLSignatureFactory signatureFactory = XMLSignatureFactory.getInstance("DOM");
 
+    ThrowingSideEffect<InvalidNameException> maybeCheckCert =
+        () -> {
+          if (config.certificate == null) {
+            throw new IllegalStateException("missing certificate");
+          }
+          emitCertificateInformation(config.certificate, msgCtxt);
+
+          if (!config.omitCertValidityCheck) {
+            checkCertificateValidity(config.certificate, msgCtxt);
+          }
+        };
+
+    ThrowingSupplier<Element, InvalidNameException> issuerSerialMaker =
+        () -> {
+          Element x509IssuerName = doc.createElementNS(Namespaces.XMLDSIG, "X509IssuerName");
+          if (config.issuerNameStyle == IssuerNameStyle.COMMON_NAME) {
+            x509IssuerName.setTextContent(
+                "CN=" + getCommonName(config.certificate.getSubjectX500Principal()));
+          } else {
+            x509IssuerName.setTextContent(config.certificate.getSubjectDN().getName());
+          }
+          Element x509SerialNumber = doc.createElementNS(Namespaces.XMLDSIG, "X509SerialNumber");
+          x509SerialNumber.setTextContent(config.certificate.getSerialNumber().toString());
+
+          Element x509IssuerSerial = doc.createElementNS(Namespaces.XMLDSIG, "X509IssuerSerial");
+          x509IssuerSerial.appendChild(x509IssuerName);
+          x509IssuerSerial.appendChild(x509SerialNumber);
+          return x509IssuerSerial;
+        };
+
     String digestMethodUri =
-        ((signConfiguration.digestMethod != null)
-                && (signConfiguration.digestMethod.toLowerCase().equals("sha256")))
+        ((config.digestMethod != null) && (config.digestMethod.toLowerCase().equals("sha256")))
             ? DigestMethod.SHA256
             : DigestMethod.SHA1;
     DigestMethod digestMethod = signatureFactory.newDigestMethod(digestMethodUri, null);
@@ -103,8 +136,7 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
 
     // add <SignatureMethod Algorithm="..."?>
     String signingMethodUri =
-        ((signConfiguration.signingMethod != null)
-                && (signConfiguration.signingMethod.toLowerCase().equals("rsa-sha1")))
+        ((config.signingMethod != null) && (config.signingMethod.toLowerCase().equals("rsa-sha1")))
             ? RSA_SHA1
             : RSA_SHA256;
 
@@ -121,7 +153,7 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
 
     KeyInfoFactory kif = signatureFactory.getKeyInfoFactory();
     KeyInfo keyInfo = null;
-    if (signConfiguration.keyIdentifierType == KeyIdentifierType.RSA_KEY_VALUE) {
+    if (config.keyIdentifierType == KeyIdentifierType.RSA_KEY_VALUE) {
       // <KeyInfo>
       //   <KeyValue>
       //     <RSAKeyValue>
@@ -135,7 +167,7 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
       Element modulus = doc.createElementNS(Namespaces.XMLDSIG, "Modulus");
       Element exponent = doc.createElementNS(Namespaces.XMLDSIG, "Exponent");
 
-      RSAPrivateKey configPrivateKey = (RSAPrivateKey) signConfiguration.privatekey;
+      RSAPrivateKey configPrivateKey = (RSAPrivateKey) config.privatekey;
       final byte[] keyModulus = configPrivateKey.getModulus().toByteArray();
       String encodedModulus = Base64.getEncoder().encodeToString(keyModulus);
       modulus.setTextContent(encodedModulus);
@@ -145,49 +177,64 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
       rsaKeyValue.appendChild(modulus);
       rsaKeyValue.appendChild(exponent);
       keyValue.appendChild(rsaKeyValue);
-      javax.xml.crypto.XMLStructure structure = new javax.xml.crypto.dom.DOMStructure(keyValue);
-      keyInfo = kif.newKeyInfo(java.util.Collections.singletonList(structure));
+      XMLStructure structure = new DOMStructure(keyValue);
+      keyInfo = kif.newKeyInfo(Collections.singletonList(structure));
 
-      // KeyValue kv = kif.newKeyValue(kp.getPublic());
-      //
-      // // new DOMSignContext(kp.getPrivate(), doc.getDocumentElement());
-      // //
-      // // The marshalled XMLSignature will be added as the last child element
-      // // of the specified parent node unless a next sibling node is specified
-      // // by invoking the setNextSibling method.
-      //
-      // DOMSignContext signingContext = new DOMSignContext(kp.getPrivate(),
-      // doc.getDocumentElement());
-      // XMLSignature signature =
-      //     signatureFactory.newXMLSignature(signedInfo,
-      // kif.newKeyInfo(Collections.singletonList(kv)));
-
-    } else if (signConfiguration.keyIdentifierType == KeyIdentifierType.X509_CERT_DIRECT) {
+    } else if ((config.keyIdentifierType == KeyIdentifierType.X509_CERT_DIRECT)
+        || (config.keyIdentifierType == KeyIdentifierType.X509_CERT_DIRECT_AND_ISSUER_SERIAL)) {
       // <KeyInfo>
       //   <X509Data>
-      //
-      // <X509Certificate>MIICAjCCAWugAw....AQnEdD9tI7IYAAoK4O+35EOzcXbvc4Kzz7BQnulQ=</X509Certificate>
+      //     <X509Certificate>MIICAjCCAWugAw....AQnI7IYAAKzz7BQnulQ=</X509Certificate>
       //   </X509Data>
       // </KeyInfo>
+      //
+      // -or-
+      //
+      // <KeyInfo>
+      //   <X509Data>
+      //     <X509IssuerSerial>
+      //       <X509IssuerName>CN=creditoexpress</X509IssuerName>
+      //       <X509SerialNumber>1323432320</X509SerialNumber>
+      //     </X509IssuerSerial>
+      //     <X509Certificate>MIICAjCCAWugAw....AQnI7IYAAKzz7BQnulQ=</X509Certificate>
+      //   </X509Data>
+      // </KeyInfo>
+      //
+      maybeCheckCert.invoke();
+
       Element x509Data = doc.createElementNS(Namespaces.XMLDSIG, "X509Data");
-      Element x509Certificate = doc.createElementNS(Namespaces.XMLDSIG, "X509Certificate");
-      if (signConfiguration.certificate == null) {
-        throw new IllegalStateException("missing certificate");
+      if (config.keyIdentifierType == KeyIdentifierType.X509_CERT_DIRECT_AND_ISSUER_SERIAL) {
+        x509Data.appendChild(issuerSerialMaker.get());
       }
+
+      Element x509Certificate = doc.createElementNS(Namespaces.XMLDSIG, "X509Certificate");
       x509Certificate.setTextContent(
-          Base64.getEncoder().encodeToString(signConfiguration.certificate.getEncoded()));
+          Base64.getEncoder().encodeToString(config.certificate.getEncoded()));
       x509Data.appendChild(x509Certificate);
-      javax.xml.crypto.XMLStructure structure = new javax.xml.crypto.dom.DOMStructure(x509Data);
-      keyInfo = kif.newKeyInfo(java.util.Collections.singletonList(structure));
-    }
-    else {
+      XMLStructure structure = new DOMStructure(x509Data);
+      keyInfo = kif.newKeyInfo(Collections.singletonList(structure));
+    } else if (config.keyIdentifierType == KeyIdentifierType.X509_ISSUER_SERIAL) {
+      // <KeyInfo>
+      //   <X509Data>
+      //     <X509IssuerSerial>
+      //       <X509IssuerName>CN=creditoexpress</X509IssuerName>
+      //       <X509SerialNumber>1323432320</X509SerialNumber>
+      //     </X509IssuerSerial>
+      //   </X509Data>
+      // </KeyInfo>
+      //
+      maybeCheckCert.invoke();
+      Element x509Data = doc.createElementNS(Namespaces.XMLDSIG, "X509Data");
+      x509Data.appendChild(issuerSerialMaker.get());
+      XMLStructure structure = new DOMStructure(x509Data);
+      keyInfo = kif.newKeyInfo(Collections.singletonList(structure));
+    } else {
       throw new IllegalStateException("unsupported KeyInfo format");
     }
 
-    // DOMSignContext signingContext = new DOMSignContext(signConfiguration.privatekey,
+    // DOMSignContext signingContext = new DOMSignContext(config.privatekey,
     // wssecHeader);
-    DOMSignContext signingContext =
-        new DOMSignContext(signConfiguration.privatekey, doc.getDocumentElement());
+    DOMSignContext signingContext = new DOMSignContext(config.privatekey, doc.getDocumentElement());
     XMLSignature signature = signatureFactory.newXMLSignature(signedInfo, keyInfo);
     signature.sign(signingContext);
 
@@ -287,8 +334,9 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
     certificateString = certificateString.trim();
     X509Certificate certificate = (X509Certificate) certificateFromPEM(certificateString);
     X500Principal principal = certificate.getIssuerX500Principal();
-    msgCtxt.setVariable(varName("cert_issuer_cn"), getCommonName(principal));
-    msgCtxt.setVariable(varName("cert_thumbprint"), getThumbprintHex(certificate));
+    msgCtxt.setVariable(varName("cert-issuer-cn"), getCommonName(principal));
+    msgCtxt.setVariable(varName("cert-sha1-thumbprint"), getThumbprintHex(certificate));
+    msgCtxt.setVariable(varName("cert-sha256-thumbprint"), getThumbprintHexSha256(certificate));
     return certificate;
   }
 
@@ -297,8 +345,9 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
     public X509Certificate certificate; // required
     public String signingMethod;
     public String digestMethod;
-    // public IssuerNameStyle issuerNameStyle;
+    public IssuerNameStyle issuerNameStyle;
     public KeyIdentifierType keyIdentifierType;
+    public boolean omitCertValidityCheck;
 
     public SignConfiguration() {
       keyIdentifierType = KeyIdentifierType.RSA_KEY_VALUE;
@@ -314,10 +363,10 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
       return this;
     }
 
-    // public SignConfiguration withIssuerNameStyle(IssuerNameStyle ins) {
-    //   this.issuerNameStyle = ins;
-    //   return this;
-    // }
+    public SignConfiguration withIssuerNameStyle(IssuerNameStyle issuerNameStyle) {
+      this.issuerNameStyle = issuerNameStyle;
+      return this;
+    }
 
     public SignConfiguration withCertificate(X509Certificate certificate) {
       this.certificate = certificate;
@@ -333,6 +382,11 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
       this.digestMethod = digestMethod;
       return this;
     }
+
+    public SignConfiguration withOmitCertValidityCheck(boolean omitCertValidityCheck) {
+      this.omitCertValidityCheck = omitCertValidityCheck;
+      return this;
+    }
   }
 
   public ExecutionResult execute(final MessageContext msgCtxt, final ExecutionContext execContext) {
@@ -343,10 +397,12 @@ public class Sign extends XmlDsigCalloutBase implements Execution {
               .withKey(getPrivateKey(msgCtxt))
               .withKeyIdentifierType(getKeyIdentifierType(msgCtxt))
               .withCertificate(getCertificate(msgCtxt))
+              .withIssuerNameStyle(getIssuerNameStyle(msgCtxt))
               .withSigningMethod(getSigningMethod(msgCtxt))
-              .withDigestMethod(getDigestMethod(msgCtxt));
+              .withDigestMethod(getDigestMethod(msgCtxt))
+              .withOmitCertValidityCheck(getOmitCertValidityCheck(msgCtxt));
 
-      String resultingXmlString = sign_RSA(document, signConfiguration);
+      String resultingXmlString = sign_RSA(document, signConfiguration, msgCtxt);
       String outputVar = getOutputVar(msgCtxt);
       msgCtxt.setVariable(outputVar, resultingXmlString);
       return ExecutionResult.SUCCESS;

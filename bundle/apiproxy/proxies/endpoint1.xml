@@ -77,6 +77,27 @@
       <Condition>(proxy.pathsuffix ~ "/sign2") and (request.verb = "POST")</Condition>
     </Flow>
 
+    <Flow name="sign3">
+      <Request>
+        <Step>
+          <Condition>NOT((request.header.content-type =| "text/xml") OR (request.header.content-type =| "application/xml" ))</Condition>
+          <Name>RF-InvalidRequest</Name>
+        </Step>
+      </Request>
+      <Response>
+        <Step>
+          <Name>AM-PrivateKey3-And-Cert</Name>
+        </Step>
+        <Step>
+          <Name>Java-XMLDSIG-Sign-With-Embedded-Cert-And-Issuer-Serial</Name>
+        </Step>
+        <Step>
+          <Name>AM-SignatureResponse</Name>
+        </Step>
+      </Response>
+      <Condition>(proxy.pathsuffix ~ "/sign3") and (request.verb = "POST")</Condition>
+    </Flow>
+
     <Flow name="validate1">
       <Request>
         <Step>
@@ -117,6 +138,24 @@
         </Step>
       </Response>
       <Condition>(proxy.pathsuffix ~ "/validate2") and (request.verb = "POST")</Condition>
+    </Flow>
+
+    <Flow name="validate3">
+      <Request>
+        <Step>
+          <Condition>NOT((request.header.content-type =| "text/xml") OR (request.header.content-type =| "application/xml" ))</Condition>
+          <Name>RF-InvalidRequest</Name>
+        </Step>
+      </Request>
+      <Response>
+        <Step>
+          <Name>Java-XMLDSIG-Validate-Via-Embedded-Cert</Name>
+        </Step>
+        <Step>
+          <Name>AM-ValidationResponse</Name>
+        </Step>
+      </Response>
+      <Condition>(proxy.pathsuffix ~ "/validate3") and (request.verb = "POST")</Condition>
     </Flow>
 
     <Flow name="unknown">

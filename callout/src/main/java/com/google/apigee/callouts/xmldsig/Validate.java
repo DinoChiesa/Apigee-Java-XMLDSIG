@@ -24,12 +24,9 @@ import java.io.StringReader;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
-import java.security.cert.CertificateExpiredException;
-import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.RSAPublicKeySpec;
-import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +80,7 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
   private List<String> getCertificateThumbprints(MessageContext msgCtxt) throws Exception {
     String nameList = getSimpleOptionalProperty("certificate-thumbprints", msgCtxt);
     if (nameList == null) {
-       nameList = getSimpleOptionalProperty("certificate-thumbprint", msgCtxt);
+      nameList = getSimpleOptionalProperty("certificate-thumbprint", msgCtxt);
     }
     if (nameList == null) return null;
     nameList = nameList.trim();
@@ -101,7 +98,7 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
         .collect(Collectors.toList());
   }
 
-  private static Element getChildByTagNameNS(
+  private static Element childByTagNameNS(
       Element parent, String targetNodeName, String targetNodeNS) {
     for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
       if (child instanceof Element
@@ -113,8 +110,7 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
     return null;
   }
 
-  private static Element getXmlDsigElementByPath(Element subtreeRoot, String path)
-      throws Exception {
+  private static Element xmlDsigElementByPath(Element subtreeRoot, String path) throws Exception {
     String[] parts = path.split("/");
     Element currentElement = subtreeRoot;
     for (int i = 0; i < parts.length; i++) {
@@ -124,7 +120,7 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
       // }
       // currentElement = (Element) nl.item(0);
 
-      currentElement = getChildByTagNameNS(currentElement, parts[i], XMLSignature.XMLNS);
+      currentElement = childByTagNameNS(currentElement, parts[i], XMLSignature.XMLNS);
       if (currentElement == null) {
         throw new RuntimeException(String.format("Couldn't find '%s' element", parts[i]));
       }
@@ -137,12 +133,12 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
 
     // Validate just the first signature. Will not handle multiple
     // distinct signatures.
-    Element signatureElement = getXmlDsigElementByPath(doc.getDocumentElement(), "Signature");
+    Element signatureElement = xmlDsigElementByPath(doc.getDocumentElement(), "Signature");
 
-    Element signedInfo = getXmlDsigElementByPath(signatureElement, "SignedInfo");
+    Element signedInfo = xmlDsigElementByPath(signatureElement, "SignedInfo");
 
     // check that the signature applies to the root element
-    Element reference = getXmlDsigElementByPath(signedInfo, "Reference");
+    Element reference = xmlDsigElementByPath(signedInfo, "Reference");
     String referenceURI = reference.getAttribute("URI");
     if (referenceURI == null) {
       throw new RuntimeException(
@@ -155,7 +151,7 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
 
     if ((config.signingMethod != null) || (config.digestMethod != null)) {
       if (config.signingMethod != null) {
-        Element signatureMethod = getXmlDsigElementByPath(signedInfo, "SignatureMethod");
+        Element signatureMethod = xmlDsigElementByPath(signedInfo, "SignatureMethod");
         String algorithm = signatureMethod.getAttribute("Algorithm");
         if ((config.signingMethod.equals("rsa-sha1") && !RSA_SHA1.equals(algorithm))
             || (config.signingMethod.equals("rsa-sha256") && !RSA_SHA256.equals(algorithm))) {
@@ -164,7 +160,7 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
       }
 
       if (config.digestMethod != null) {
-        Element digestMethod = getXmlDsigElementByPath(signedInfo, "Reference/DigestMethod");
+        Element digestMethod = xmlDsigElementByPath(signedInfo, "Reference/DigestMethod");
         String algorithm = digestMethod.getAttribute("Algorithm");
         if ((config.digestMethod.equals("sha1") && !DigestMethod.SHA1.equals(algorithm))
             || (config.digestMethod.equals("sha256") && !DigestMethod.SHA256.equals(algorithm))) {
@@ -176,33 +172,15 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
     if (config.keyIdentifierType == KeyIdentifierType.X509_CERT_DIRECT) {
       // obtain public key from cert at this xpath: Signature/KeyInfo/X509Data/X509Certificate
       Element x509CertElement =
-          getXmlDsigElementByPath(signatureElement, "KeyInfo/X509Data/X509Certificate");
+          xmlDsigElementByPath(signatureElement, "KeyInfo/X509Data/X509Certificate");
 
-      String certString =
-          "-----BEGIN CERTIFICATE-----\n"
-              + x509CertElement.getTextContent()
-              + "\n-----END CERTIFICATE-----";
+      X509Certificate embeddedCertificate =
+          (X509Certificate) certificateFromEncoded(x509CertElement.getTextContent());
+      emitCertificateInformation(embeddedCertificate, msgCtxt);
 
-      X509Certificate embeddedCertificate = (X509Certificate) certificateFromPEM(certString);
-      try {
-        // check notBefore and notAfter dates
-        embeddedCertificate.checkValidity();
-      } catch (CertificateExpiredException cee) {
-        throw new RuntimeException("The embedded certificate is expired.");
-      } catch (CertificateNotYetValidException cnyve) {
-        throw new RuntimeException("The embedded certificate is not yet valid.");
+      if (!config.omitCertValidityCheck) {
+        checkCertificateValidity(embeddedCertificate, msgCtxt);
       }
-      // emit some information about the embedded certificate into the message context
-      msgCtxt.setVariable(
-          varName("cert-notAfter"),
-          DateTimeFormatter.ISO_INSTANT.format(embeddedCertificate.getNotAfter().toInstant()));
-      msgCtxt.setVariable(
-          varName("cert-notBefore"),
-          DateTimeFormatter.ISO_INSTANT.format(embeddedCertificate.getNotBefore().toInstant()));
-      msgCtxt.setVariable(
-          varName("cert-subject-cn"), getCommonName(embeddedCertificate.getSubjectX500Principal()));
-      msgCtxt.setVariable(
-          varName("cert-issuer-cn"), getCommonName(embeddedCertificate.getIssuerX500Principal()));
 
       if (config.acceptableCertificateThumbprints_sha256 != null) {
         String thumbprint_sha256 = getThumbprintHexSha256(embeddedCertificate);
@@ -211,16 +189,14 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
         if (!config.acceptableCertificateThumbprints_sha256.contains(thumbprint_sha256)) {
           throw new RuntimeException("Untrusted thumbprint on certificate");
         }
-      }
-      else if (config.acceptableCertificateThumbprints_sha1 != null) {
+      } else if (config.acceptableCertificateThumbprints_sha1 != null) {
         String thumbprint_sha1 = getThumbprintHex(embeddedCertificate);
         msgCtxt.setVariable(varName("cert-sha1-thumbprint"), thumbprint_sha1);
 
         if (!config.acceptableCertificateThumbprints_sha1.contains(thumbprint_sha1)) {
           throw new RuntimeException("Untrusted thumbprint on certificate");
         }
-      }
-      else {
+      } else {
         throw new RuntimeException("No way to validate thumbprint on certificate");
       }
       publicKey = embeddedCertificate.getPublicKey();
@@ -245,6 +221,7 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
     public String signingMethod;
     public String digestMethod;
     public KeyIdentifierType keyIdentifierType;
+    public boolean omitCertValidityCheck;
 
     public ValidateConfiguration() {
       keyIdentifierType = KeyIdentifierType.RSA_KEY_VALUE;
@@ -265,7 +242,8 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
       return this;
     }
 
-    public ValidateConfiguration withCertificateThumbprints_S256(List<String> certificateThumbprints) {
+    public ValidateConfiguration withCertificateThumbprints_S256(
+        List<String> certificateThumbprints) {
       this.acceptableCertificateThumbprints_sha256 = certificateThumbprints;
       return this;
     }
@@ -277,6 +255,11 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
 
     public ValidateConfiguration withDigestMethod(String digestMethod) {
       this.digestMethod = digestMethod;
+      return this;
+    }
+
+    public ValidateConfiguration withOmitCertValidityCheck(boolean omitCertValidityCheck) {
+      this.omitCertValidityCheck = omitCertValidityCheck;
       return this;
     }
   }
@@ -292,7 +275,8 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
               .withCertificateThumbprints(getCertificateThumbprints(msgCtxt))
               .withCertificateThumbprints_S256(getCertificateThumbprints_S256(msgCtxt))
               .withSigningMethod(getSigningMethod(msgCtxt))
-              .withDigestMethod(getDigestMethod(msgCtxt));
+              .withDigestMethod(getDigestMethod(msgCtxt))
+              .withOmitCertValidityCheck(getOmitCertValidityCheck(msgCtxt));
 
       PublicKey publicKey = getPublicKey(msgCtxt);
       boolean isValid = validate_RSA(document, validateConfiguration, msgCtxt);

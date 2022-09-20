@@ -64,25 +64,61 @@ Configure the policy this way:
     <Property name='private-key-password'>{my_private_key_password}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Sign</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220919a.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20220920.jar</ResourceURL>
 </JavaCallout>
 ```
 
 This policy will sign the entire document and embed a Signature element as a child of the root element.
 
 
-The available properties for signing are:
+The available properties _for signing_ are:
 
-| name                 | description |
-| -------------------- | ------------ |
+| name                   | description |
+| ---------------------- | ------------ |
 | `source`               | optional. the variable name in which to obtain the source document to sign. Defaults to `message.content` |
 | `output-variable`      | optional. the variable name in which to write the signed XML. Defaults to message.content |
-| `signing-method` | optional. Either `rsa-sha1` or `rsa-sha256`. Defaults to `rsa-sha256`. |
-| `digest-method` | optional. Either `sha1` or `sha256`. Defaults to `sha256`. |
+| `signing-method`       | optional. Either `rsa-sha1` or `rsa-sha256`. Defaults to `rsa-sha256`. |
+| `digest-method`        | optional. Either `sha1` or `sha256`. Defaults to `sha256`. |
 | `private-key`          | required. the PEM-encoded RSA private key. You can use a variable reference here as shown above. Probably you want to read this from encrypted KVM. |
 | `private-key-password` | optional. The password for the key if any. |
-| `key-identifier-type` | optional. Either `RSA_KEY_VALUE` or `X509_CERT_DIRECT`. Defaults to `RSA_KEY_VALUE` |
-| `certificate` | optional. Specifies the PEM-encoded certificate to embed into the signed document. Useful only when `key-identifier-type` is `X509_CERT_DIRECT`. |
+| `key-identifier-type`  | optional. One of { `RSA_KEY_VALUE`, `X509_CERT_DIRECT`, `X509_CERT_DIRECT_AND_ISSUER_SERIAL` }. Defaults to `RSA_KEY_VALUE` |
+| `issuer-name-style`    | optional. One of { `COMMON_NAME`, `DN` }. Defaults to `COMMON_NAME`. Used only when `key-identifier-type` is `X509_CERT_DIRECT_AND_ISSUER_SERIAL` .  |
+| `certificate`          | optional. Specifies the PEM-encoded certificate to embed into the signed document. Useful only when `key-identifier-type` is `X509_CERT_DIRECT`. |
+
+The `key-identifier-type` tells the signing callout how to format the KeyInfo element in the signed document.  Some examples are:
+* `RSA_KEY_VALUE`
+  ```
+   <KeyInfo>
+     <KeyValue>
+       <RSAKeyValue>
+         <Modulus>B6PenDyT58LjZlG6LYD27IFCh1yO+4...yCP9YNDtsLZftMLoQ==</Modulus>
+         <Exponent>AQAB</Exponent>
+       </RSAKeyValue>
+     </KeyValue>
+   </KeyInfo>
+  ```
+
+* `X509_CERT_DIRECT`
+  ```
+   <KeyInfo>
+     <X509Data>
+       <X509Certificate>MIICAjCCAWugAw....AQnI7IYAAKzz7BQnulQ=</X509Certificate>
+     </X509Data>
+   </KeyInfo>
+  ```
+
+* `X509_CERT_DIRECT_AND_ISSUER_SERIAL`
+  ```
+   <KeyInfo>
+     <X509Data>
+       <X509IssuerSerial>
+         <X509IssuerName>CN=issuer-common-name</X509IssuerName>
+         <X509SerialNumber>1323432320</X509SerialNumber>
+       </X509IssuerSerial>
+       <X509Certificate>MIICAjCCAWugAw....AQnI7IYAAKzz7BQnulQ=</X509Certificate>
+     </X509Data>
+   </KeyInfo>
+  ```
 
 ### Validating
 
@@ -96,7 +132,7 @@ If you have a public key, configure the policy this way:
     <Property name='public-key'>{my_public_key}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220919a.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20220920.jar</ResourceURL>
 </JavaCallout>
 ```
 
@@ -110,11 +146,11 @@ if you want to validate the signature using a certificate that is embedded withi
     <Property name='certificate-thumbprint'>{sha1-thumbprint-of-acceptable-cert}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220919a.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20220920.jar</ResourceURL>
 </JavaCallout>
 ```
 
-The available properties for validating are:
+The available properties _for validating_ are:
 
 | name             | description |
 | ---------------- | ------------ |
@@ -122,7 +158,8 @@ The available properties for validating are:
 | `signing-method` | optional. Either `rsa-sha1` or `rsa-sha256`. If set, checks that the signature uses this signing method. |
 | `digest-method`  | optional. Either `sha1` or `sha256`. If set, checks that the signature uses this digest method. |
 | `public-key`     | optional. the PEM-encoded RSA public key. You can use a variable reference here as shown above. |
-| `key-identifier-type` | optional. Either `RSA_KEY_VALUE` or `X509_CERT_DIRECT`. Defaults to `RSA_KEY_VALUE`. If you specify  `X509_CERT_DIRECT`, the policy will extract the certificate from the signed document, and extract the public key from that certificate. You must set `certificate-thumbprint` in this case, to the SHA-1 thumbprint of the trusted certificate. This policy checks the validity of the certificate - that "right now" is before the certificate notAfter date, and  after the notBefore date. |
+| `key-identifier-type` | optional. Either `RSA_KEY_VALUE` or `X509_CERT_DIRECT`. Defaults to `RSA_KEY_VALUE`. If you specify  `X509_CERT_DIRECT`, the policy will extract the certificate from the signed document, and extract the public key from that certificate. You must set `certificate-thumbprint` in this case, to the SHA-1 thumbprint of the trusted certificate. By default, this policy checks the validity of the certificate - that "right now" is before the certificate notAfter date, and  after the notBefore date. |
+| `omit-certificate-validity-check` | optional. Specify `true` or `false`, defaults to `false`. If `true`, the policy will not perform a validity check on the certificate (a check of the notBefore and notAfter dates). This is not recommended! It means the policy might accept as valid, a certificate that is expired. |
 | `certificate-thumbprints` | optional. a comma-separated list of acceptable SHA-1 thumbprints of the certificates that are trusted. Don't use this setting, if possible. Instead use the S256 version. This property is used only when `key-identifier-type` is `X509_CERT_DIRECT`. |
 | `certificate-thumbprints-s256` | optional. a comma-separated list of acceptable SHA-256 thumbprints of the certificates that are trusted. This takes precedence over the deprecated `certificate-thumbprints`.  This property is used only when `key-identifier-type` is `X509_CERT_DIRECT`. |
 | `reform-signedinfo`      | optional. Specify `true` to tell the validating callout to reform the `SignedInfo` element to remove spaces and newlines, before validating the signature. Omit this if you'd like to avoid unnecessary busy work. |
@@ -176,6 +213,14 @@ Either form of PEM-encoded key works.
    curl -i $endpoint/xmldsig/sign2  -H content-type:application/xml \
        --data-binary @./sample-data/order.xml
    ```
+
+* Signing with key 3 and embedding the cert into the signed document
+
+   ```
+   curl -i $endpoint/xmldsig/sign3  -H content-type:application/xml \
+       --data-binary @./sample-data/order.xml
+   ```
+
 * Validating with key 1
 
    ```
@@ -211,6 +256,14 @@ Either form of PEM-encoded key works.
    against public key 1 (via /validate1) will return "false", meaning
    "The signature on the document is not valid."  This is expected.
 
+
+* Validating with an embedded certificate
+
+   ```
+   curl -i $endpoint/xmldsig/validate3  -H content-type:application/xml \
+       --data-binary @./sample-data/order-signed3.xml
+   ```
+   The output of the above is "true", meaning "The signature on the document is valid."
 
 
 ### Example of Signed Output

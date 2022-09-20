@@ -1,9 +1,11 @@
-<JavaCallout name='Java-XMLDSIG-Sign'>
+<JavaCallout name='Java-XMLDSIG-Sign-With-Embedded-Cert-And-Issuer-Serial'>
   <Properties>
     <Property name='source'>message.content</Property>
     <Property name='output-variable'>output</Property>
     <Property name='private-key'>{my_private_key}</Property>
-    <Property name='private-key-password'>{my_private_key_password}</Property>
+    <Property name='key-identifier-type'>x509_cert_direct_and_issuer_serial</Property>
+    <Property name='certificate'>{my_certificate}</Property>
+    <Property name='issuer-name-style'>common_name</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Sign</ClassName>
   <ResourceURL>java://apigee-xmldsig-20220920.jar</ResourceURL>

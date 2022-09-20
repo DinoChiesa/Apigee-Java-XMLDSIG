@@ -20,14 +20,20 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import javax.xml.crypto.dsig.XMLSignature;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
@@ -222,7 +228,8 @@ public class TestXmlDsigSignCallout extends TestBase {
   }
 
   @Test
-  public void valid_KeyIdentifier_Cert() throws Exception {
+  public void keyIdentifier_Cert() throws Exception {
+    String testName = "keyIdentifier_Cert";
     String privateKeyString =
         getResourceFileContents("keys-and-certs", "rsa-private-key-20220916.pem");
     String certString = getResourceFileContents("keys-and-certs", "x509-certificate-20220916.pem");
@@ -246,23 +253,23 @@ public class TestXmlDsigSignCallout extends TestBase {
     ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
     Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
     Object exception = msgCtxt.getVariable("xmldsig_exception");
-    Assert.assertNull(exception, "valid_KeyIdentifier_Cert() exception");
+    Assert.assertNull(exception, String.format("%s() exception", testName));
     Object errorOutput = msgCtxt.getVariable("xmldsig_error");
     Assert.assertNull(errorOutput, "error not as expected");
     Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
-    Assert.assertNull(stacktrace, "valid_KeyIdentifier_Cert() stacktrace");
+    Assert.assertNull(stacktrace, String.format("%s() stacktrace", testName));
 
     String output = (String) msgCtxt.getVariable("output");
     System.out.printf("%s\n", output);
 
     Document doc = docFromStream(new ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8)));
     NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
-    Assert.assertEquals(nl.getLength(), 1, "valid_KeyIdentifier_Cert() Signature element");
+    Assert.assertEquals(nl.getLength(), 1, String.format("%s() Signature element", testName));
     System.out.println("=========================================================");
   }
 
   @Test
-  public void validResult2() throws Exception {
+  public void withPrivateKeyPassword() throws Exception {
     msgCtxt.setVariable("message.content", simpleXml1);
     msgCtxt.setVariable("my-private-key", privateKey2);
 
@@ -278,21 +285,21 @@ public class TestXmlDsigSignCallout extends TestBase {
     ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
     Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
     Object exception = msgCtxt.getVariable("xmldsig_exception");
-    Assert.assertNull(exception, "validResult2() exception");
+    Assert.assertNull(exception, "withPrivateKeyPassword() exception");
     Object errorOutput = msgCtxt.getVariable("xmldsig_error");
     Assert.assertNull(errorOutput, "errorOutput");
     Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
-    Assert.assertNull(stacktrace, "validResult2() stacktrace");
+    Assert.assertNull(stacktrace, "withPrivateKeyPassword() stacktrace");
 
     String output = (String) msgCtxt.getVariable("output");
     Document doc = docFromStream(new ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8)));
     NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
-    Assert.assertEquals(nl.getLength(), 1, "validResult2() Signature element");
+    Assert.assertEquals(nl.getLength(), 1, "withPrivateKeyPassword() Signature element");
     System.out.println("=========================================================");
   }
 
   @Test
-  public void validResult3() throws Exception {
+  public void withBlankPrivateKeyPassword() throws Exception {
     msgCtxt.setVariable("message.content", simpleXml1);
     msgCtxt.setVariable("my-private-key", privateKey3);
 
@@ -308,16 +315,162 @@ public class TestXmlDsigSignCallout extends TestBase {
     ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
     Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
     Object exception = msgCtxt.getVariable("xmldsig_exception");
-    Assert.assertNull(exception, "validResult3() exception");
+    Assert.assertNull(exception, "withBlankPrivateKeyPassword() exception");
     Object errorOutput = msgCtxt.getVariable("xmldsig_error");
     Assert.assertNull(errorOutput, "errorOutput");
     Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
-    Assert.assertNull(stacktrace, "validResult3() stacktrace");
+    Assert.assertNull(stacktrace, "withBlankPrivateKeyPassword() stacktrace");
 
     String output = (String) msgCtxt.getVariable("output");
     Document doc = docFromStream(new ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8)));
     NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
-    Assert.assertEquals(nl.getLength(), 1, "validResult3() Signature element");
+    Assert.assertEquals(nl.getLength(), 1, "withBlankPrivateKeyPassword() Signature element");
     System.out.println("=========================================================");
   }
+
+  @DataProvider(name = "issuerNameStyles")
+  protected Object[][] getGoodSignatures() {
+    String[] issuerNameStyles = new String[] { "common_name", "dn", null, "invalid-value" };
+    return toDataProvider(issuerNameStyles);
+  };
+
+  public static List<Element> getDirectChildElements(Element parent) {
+    ArrayList<Element> list = new ArrayList<Element>();
+    for(Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+      if(child instanceof Element) {
+        list.add((Element)child);
+      }
+    }
+    return list;
+  }
+
+  @Test(dataProvider = "issuerNameStyles")
+  public void keyIdentifier_issuerSerial(int ix, String issuerNameStyle) throws Exception {
+    final String testName = "keyIdentifier_issuerSerial";
+    String privateKeyString =
+        getResourceFileContents("keys-and-certs", "rsa-private-key-20220916.pem");
+    String certString = getResourceFileContents("keys-and-certs", "x509-certificate-20220916.pem");
+
+    msgCtxt.setVariable("message.content", simpleXml1);
+    msgCtxt.setVariable("my-private-key", privateKeyString);
+    msgCtxt.setVariable("my-cert", certString);
+    msgCtxt.setVariable("debug", "true");
+
+    Map<String, String> props = new HashMap<String, String>();
+    props.put("source", "message.content");
+    props.put("private-key", "{my-private-key}");
+    props.put("key-identifier-type", "x509_issuer_serial");
+    props.put("certificate", "{my-cert}");
+    if (issuerNameStyle!=null) {
+      props.put("issuer-name-style", issuerNameStyle);
+    }
+    props.put("output-variable", "output");
+
+    Sign callout = new Sign(props);
+
+    // execute and retrieve output
+    ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
+    Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
+    Object exception = msgCtxt.getVariable("xmldsig_exception");
+    Assert.assertNull(exception, String.format("%s() exception", testName));
+    Object errorOutput = msgCtxt.getVariable("xmldsig_error");
+    Assert.assertNull(errorOutput, "errorOutput");
+    Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
+    Assert.assertNull(stacktrace, String.format("%s() stacktrace", testName));
+
+    String output = (String) msgCtxt.getVariable("output");
+
+    // verify basic structure of the output document
+    Document doc = docFromStream(new ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8)));
+    NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
+    Assert.assertEquals(nl.getLength(), 1, String.format("%s() Signature element", testName));
+    Element signature = (Element) nl.item(0);
+    nl = signature.getElementsByTagNameNS(XMLSignature.XMLNS, "X509Data");
+    Assert.assertEquals(nl.getLength(), 1, String.format("%s() X509Data element", testName));
+
+    Element x509data = (Element) nl.item(0);
+    List<Element> children = getDirectChildElements(x509data);
+    Assert.assertEquals(children.size(), 1, String.format("%s() children of X509Data", testName));
+
+    nl = x509data.getElementsByTagNameNS(XMLSignature.XMLNS, "X509IssuerSerial");
+    Assert.assertEquals(nl.getLength(), 1, String.format("%s() X509IssuerSerial element", testName));
+    Element issuerAndSerial = (Element) nl.item(0);
+    nl = issuerAndSerial.getElementsByTagNameNS(XMLSignature.XMLNS, "X509IssuerName");
+    Assert.assertEquals(nl.getLength(), 1, String.format("%s() X509IssuerName element", testName));
+    Element issuerName = (Element) nl.item(0);
+    String[] parts = issuerName.getTextContent().split(",");
+    if ("dn".equals(issuerNameStyle)) {
+      Assert.assertEquals(parts.length, 7, "issuer name segments");
+    }
+    else {
+      Assert.assertEquals(parts.length, 1, "issuer name segments");
+      Assert.assertTrue(parts[0].startsWith("CN="), "issuer name");
+    }
+    nl = x509data.getElementsByTagNameNS(XMLSignature.XMLNS, "X509SerialNumber");
+    Assert.assertEquals(nl.getLength(), 1, String.format("%s() X509SerialNumber element", testName));
+    System.out.println("=========================================================");
+  }
+
+  @Test
+  public void keyIdentifier_certDirectAndIssuerSerial() throws Exception {
+    final String testName = "keyIdentifier_certDirectAndIssuerSerial";
+    String privateKeyString =
+        getResourceFileContents("keys-and-certs", "rsa-private-key-20220916.pem");
+    String certString = getResourceFileContents("keys-and-certs", "x509-certificate-20220916.pem");
+
+    msgCtxt.setVariable("message.content", simpleXml1);
+    msgCtxt.setVariable("my-private-key", privateKeyString);
+    msgCtxt.setVariable("my-cert", certString);
+    msgCtxt.setVariable("debug", "true");
+
+    Map<String, String> props = new HashMap<String, String>();
+    props.put("source", "message.content");
+    props.put("private-key", "{my-private-key}");
+    props.put("key-identifier-type", "x509_cert_direct_and_issuer_serial");
+    props.put("certificate", "{my-cert}");
+    props.put("issuer-name-style", "common_name");
+    props.put("output-variable", "output");
+
+    Sign callout = new Sign(props);
+
+    // execute and retrieve output
+    ExecutionResult actualResult = callout.execute(msgCtxt, exeCtxt);
+    Assert.assertEquals(actualResult, ExecutionResult.SUCCESS, "result not as expected");
+    Object exception = msgCtxt.getVariable("xmldsig_exception");
+    Assert.assertNull(exception, String.format("%s() exception", testName));
+    Object errorOutput = msgCtxt.getVariable("xmldsig_error");
+    Assert.assertNull(errorOutput, "errorOutput");
+    Object stacktrace = msgCtxt.getVariable("xmldsig_stacktrace");
+    Assert.assertNull(stacktrace, String.format("%s() stacktrace", testName));
+
+    String output = (String) msgCtxt.getVariable("output");
+
+    // verify basic structure of the output document
+    Document doc = docFromStream(new ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8)));
+    NodeList nl = doc.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
+    Assert.assertEquals(nl.getLength(), 1, String.format("%s() Signature element", testName));
+    Element signature = (Element) nl.item(0);
+    nl = signature.getElementsByTagNameNS(XMLSignature.XMLNS, "X509Data");
+    Assert.assertEquals(nl.getLength(), 1, String.format("%s() X509Data element", testName));
+
+    Element x509data = (Element) nl.item(0);
+    List<Element> children = getDirectChildElements(x509data);
+    Assert.assertEquals(children.size(), 2, String.format("%s() children of X509Data", testName));
+
+    nl = x509data.getElementsByTagNameNS(XMLSignature.XMLNS, "X509IssuerSerial");
+    Assert.assertEquals(nl.getLength(), 1, String.format("%s() X509IssuerSerial element", testName));
+    Element issuerAndSerial = (Element) nl.item(0);
+    nl = issuerAndSerial.getElementsByTagNameNS(XMLSignature.XMLNS, "X509IssuerName");
+    Assert.assertEquals(nl.getLength(), 1, String.format("%s() X509IssuerName element", testName));
+    Element issuerName = (Element) nl.item(0);
+    String[] parts = issuerName.getTextContent().split(",");
+
+      Assert.assertEquals(parts.length, 1, "issuer name segments");
+      Assert.assertTrue(parts[0].startsWith("CN="), "issuer name");
+
+    nl = x509data.getElementsByTagNameNS(XMLSignature.XMLNS, "X509SerialNumber");
+    Assert.assertEquals(nl.getLength(), 1, String.format("%s() X509SerialNumber element", testName));
+    System.out.println("=========================================================");
+  }
+
 }
