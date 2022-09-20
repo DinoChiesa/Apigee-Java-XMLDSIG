@@ -13,7 +13,7 @@ This example is not an official Google product, nor is it part of an official Go
 
 ## License
 
-This material is copyright 2018-2021, Google LLC.
+This material is copyright 2018-2022, Google LLC.
 and is licensed under the Apache 2.0 license. See the [LICENSE](LICENSE) file.
 
 This code is open source but you don't need to compile it in order to use it.
@@ -22,8 +22,13 @@ This code is open source but you don't need to compile it in order to use it.
 
 There are two callout classes,
 
-* com.google.apigee.callouts.xmldsig.Sign - signs the input document.
-* com.google.apigee.callouts.xmldsig.Validate - validates the signed document
+* `com.google.apigee.callouts.xmldsig.Sign` - signs the input document.
+  Always signs the root element, and always embeds the signature as a child of the root element.
+
+* `com.google.apigee.callouts.xmldsig.Validate` - validates the signed document.
+  It verifies that the signature is a child of the root element, and that the signed element is the root element.
+  It can validate using either a public key, or via a certificate embedded in the Signature element of the document.
+  In this latter case you must configure the callout with a set of one or more certificate thumbprints to trust.
 
 The signature uses these settings:
 * http://www.w3.org/2000/09/xmldsig
@@ -34,9 +39,11 @@ The signature uses these settings:
 * sha256 or SHA1 digest. SHA1 is dis-recommended.
 * embeds the key identifier as an RSA public key directly, or with an X509 certificate.
 
-These behaviors are hardcoded into the callout. To modify them, you will
+These behaviors are hardcoded into the callout. If you need something else, you will
 need to change the callout code. File a pull request if you think it's
-useful!
+useful!  Or you can ask on the [Apigee community
+site](https://www.googlecloudcommunity.com/gc/Apigee/bd-p/cloud-apigee).
+
 
 ## Runtime Dependencies
 
@@ -44,7 +51,7 @@ useful!
 
 The BouncyCastle jar is available as part of the Apigee runtime, although it is
 not a documented part of the Apigee platform and is therefore not guaranteed to
-remain available. In the highly unlikely future scenario in which Apigee removes
+remain available in subsequent releases. In the highly unlikely future scenario in which Apigee removes
 the BC jar from the Apigee runtime, you could simply upload the BouncyCastle jar
 as a resource, either with the apiproxy or with the organization or environment,
 to resolve the dependency.
@@ -61,6 +68,7 @@ Configure the policy this way:
     <Property name='source'>message.content</Property>
     <Property name='output-variable'>output</Property>
     <Property name='private-key'>{my_private_key}</Property>
+    <!-- optional -->
     <Property name='private-key-password'>{my_private_key_password}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Sign</ClassName>
@@ -68,7 +76,33 @@ Configure the policy this way:
 </JavaCallout>
 ```
 
-This policy will sign the entire document and embed a Signature element as a child of the root element.
+This policy will sign the entire document and embed a Signature element as a
+child of the root element. The signature will embed a KeyInfo element containing
+an RSAKeyValue.
+
+
+To embed a certificate into the signed document, configure the policy this way:
+
+```xml
+<JavaCallout name='Java-XMLDSIG-Sign'>
+  <Properties>
+    <Property name='source'>message.content</Property>
+    <Property name='output-variable'>output</Property>
+    <Property name='private-key'>{my_private_key}</Property>
+    <Property name='certificate'>{my_certificate}</Property>
+
+    <Property name='key-identifier-type'>x509_cert_direct</Property>
+    <!-- or x509_cert_direct_and_issuer_serial -->
+  </Properties>
+  <ClassName>com.google.apigee.callouts.xmldsig.Sign</ClassName>
+  <ResourceURL>java://apigee-xmldsig-20220920.jar</ResourceURL>
+</JavaCallout>
+```
+
+This policy will sign the entire document and embed a Signature element as a
+child of the root element. The signature will embed a KeyInfo element containing
+an X509Data element, embedding the X509Certificate (and optionally the
+X509IssuerSerial element).
 
 
 The available properties _for signing_ are:
@@ -79,11 +113,11 @@ The available properties _for signing_ are:
 | `output-variable`      | optional. the variable name in which to write the signed XML. Defaults to message.content |
 | `signing-method`       | optional. Either `rsa-sha1` or `rsa-sha256`. Defaults to `rsa-sha256`. |
 | `digest-method`        | optional. Either `sha1` or `sha256`. Defaults to `sha256`. |
-| `private-key`          | required. the PEM-encoded RSA private key. You can use a variable reference here as shown above. Probably you want to read this from encrypted KVM. |
+| `private-key`          | required. the PEM-encoded RSA private key. You can use a variable reference here as shown above. Probably you want to configure your proxy to read this from encrypted KVM. |
 | `private-key-password` | optional. The password for the key if any. |
 | `key-identifier-type`  | optional. One of { `RSA_KEY_VALUE`, `X509_CERT_DIRECT`, `X509_CERT_DIRECT_AND_ISSUER_SERIAL` }. Defaults to `RSA_KEY_VALUE` |
 | `issuer-name-style`    | optional. One of { `COMMON_NAME`, `DN` }. Defaults to `COMMON_NAME`. Used only when `key-identifier-type` is `X509_CERT_DIRECT_AND_ISSUER_SERIAL` .  |
-| `certificate`          | optional. Specifies the PEM-encoded certificate to embed into the signed document. Useful only when `key-identifier-type` is `X509_CERT_DIRECT`. |
+| `certificate`          | optional. Specifies the PEM-encoded certificate to embed into the signed document. Useful only when `key-identifier-type` is `X509_CERT_DIRECT` or `X509_CERT_DIRECT_AND_ISSUER_SERIAL` . |
 
 The `key-identifier-type` tells the signing callout how to format the KeyInfo element in the signed document.  Some examples are:
 * `RSA_KEY_VALUE`
@@ -200,8 +234,8 @@ Either form of PEM-encoded key works.
    ORG=myorgname
    ENV=myenv
    endpoint=https://${ORG}-${ENV}.apigee.net
-   # Apigee X
-   endpoint=https://my-apigee-x.example.org
+   # Apigee X or hybrid
+   endpoint=https://my-apigee-hostname.example.org
 
    curl -i $endpoint/xmldsig/sign1  -H content-type:application/xml \
        --data-binary @./sample-data/order.xml
@@ -257,7 +291,7 @@ Either form of PEM-encoded key works.
    "The signature on the document is not valid."  This is expected.
 
 
-* Validating with an embedded certificate
+* Validating a signed document that has an embedded certificate:
 
    ```
    curl -i $endpoint/xmldsig/validate3  -H content-type:application/xml \
@@ -311,7 +345,7 @@ Supposing the input XML looks like this:
 </order>
 ```
 
-...the signed payload looks like this:
+...the signed payload (with the default settings) looks like this:
 
 ```
 <?xml version="1.0" encoding="UTF-8" standalone="no"?><order>
@@ -361,7 +395,7 @@ vACs6usAj4wR04yj5yElXW+pQ5Vk4RUwR6Q0E8nKWLfYFrXygeYUbTSQEj0f44DGVHOdMdT+BoGV
 5SJ1ITs+peOCYjhVZvdngyCP9YNDtsLZftMLoQ==</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue></KeyInfo></Signature></order>
 ```
 
-## Notes
+## Important Note
 
 XML Digital Signature is sensitive to whitespace!
 
@@ -395,8 +429,13 @@ sub-tree! It works only on the `SignedInfo` element.
 
 To avoid all of this, do not modify the signed document before validation.
 
+## Support
+
+This is open source software. It is officially unsupported. You may ask
+questions or request assistance by posting to the [Apigee community
+site](https://www.googlecloudcommunity.com/gc/Apigee/bd-p/cloud-apigee).
+
 
 ## Bugs
 
 None reported.
-
