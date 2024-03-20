@@ -1,4 +1,4 @@
-// Copyright 2018-2022 Google LLC
+// Copyright 2018-2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,6 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.time.format.DateTimeFormatter;
-import java.util.Base64;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -327,11 +326,11 @@ public abstract class XmlDsigCalloutBase {
     }
   }
 
-  protected static String getThumbprintBase64(X509Certificate certificate)
-      throws NoSuchAlgorithmException, CertificateEncodingException {
-    return Base64.getEncoder()
-        .encodeToString(MessageDigest.getInstance("SHA-1").digest(certificate.getEncoded()));
-  }
+  // protected static String getThumbprintBase64(X509Certificate certificate)
+  //     throws NoSuchAlgorithmException, CertificateEncodingException {
+  //   return Base64.getEncoder()
+  //       .encodeToString(MessageDigest.getInstance("SHA-1").digest(certificate.getEncoded()));
+  // }
 
   protected static String getThumbprintHex(X509Certificate certificate)
       throws NoSuchAlgorithmException, CertificateEncodingException {
@@ -343,7 +342,7 @@ public abstract class XmlDsigCalloutBase {
   protected static String getThumbprintHexSha256(X509Certificate certificate)
       throws NoSuchAlgorithmException, CertificateEncodingException {
     return DatatypeConverter.printHexBinary(
-        MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded()))
+            MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded()))
         .toLowerCase();
   }
 

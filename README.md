@@ -1,4 +1,4 @@
-# Apigee Java callout for  XML Digital Signature
+# Apigee Java callout for XML Digital Signature
 
 This directory contains the Java source code and pom.xml file required
 to compile a simple Java callout for Apigee , that performs an
@@ -13,7 +13,7 @@ This example is not an official Google product, nor is it part of an official Go
 
 ## License
 
-This material is copyright 2018-2022, Google LLC.
+This material is copyright 2018-2024, Google LLC.
 and is licensed under the Apache 2.0 license. See the [LICENSE](LICENSE) file.
 
 This code is open source but you don't need to compile it in order to use it.
@@ -26,9 +26,10 @@ There are two callout classes,
   Always signs the root element, and always embeds the signature as a child of the root element.
 
 * `com.google.apigee.callouts.xmldsig.Validate` - validates the signed document.
-  It verifies that the signature is a child of the root element, and that the signed element is the root element.
+  It verifies that the Signature is a child of the root element, and that the signed element is the root element.
   It can validate using either a public key, or via a certificate embedded in the Signature element of the document.
-  In this latter case you must configure the callout with a set of one or more certificate thumbprints to trust.
+  In this latter case, the callout verifies the validity of the certificate (it is not expired), and additionally,
+  you must configure the callout with a set of one or more certificate thumbprints to trust.
 
 The signature uses these settings:
 * http://www.w3.org/2000/09/xmldsig
@@ -39,7 +40,7 @@ The signature uses these settings:
 * sha256 or SHA1 digest. SHA1 is dis-recommended.
 * embeds the key identifier as an RSA public key directly, or with an X509 certificate.
 
-These behaviors are hardcoded into the callout. If you need something else, you will
+If you need the callout to support some other behavior, you will
 need to change the callout code. File a pull request if you think it's
 useful!  Or you can ask on the [Apigee community
 site](https://www.googlecloudcommunity.com/gc/Apigee/bd-p/cloud-apigee).
@@ -72,7 +73,7 @@ Configure the policy this way:
     <Property name='private-key-password'>{my_private_key_password}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Sign</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220920.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20240319.jar</ResourceURL>
 </JavaCallout>
 ```
 
@@ -95,7 +96,7 @@ To embed a certificate into the signed document, configure the policy this way:
     <!-- or x509_cert_direct_and_issuer_serial -->
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Sign</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220920.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20240319.jar</ResourceURL>
 </JavaCallout>
 ```
 
@@ -166,7 +167,7 @@ If you have a public key, configure the policy this way:
     <Property name='public-key'>{my_public_key}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220920.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20240319.jar</ResourceURL>
 </JavaCallout>
 ```
 
@@ -176,8 +177,8 @@ if you want to validate the signature using a certificate that is embedded withi
 <JavaCallout name='Java-XMLDSIG-Validate'>
   <Properties>
     <Property name='source'>message.content</Property>
-    <Property name='key-identifier-type'>X509_CERT_DIRECT</property>
-    <Property name='certificate-thumbprint'>{sha1-thumbprint-of-acceptable-cert}</Property>
+    <Property name='key-identifier-type'>X509_CERT_DIRECT</Property>
+    <Property name='certificate-thumbprints'>{sha1-thumbprint-of-acceptable-cert}</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
   <ResourceURL>java://apigee-xmldsig-20220920.jar</ResourceURL>
@@ -192,8 +193,8 @@ The available properties _for validating_ are:
 | `signing-method` | optional. Either `rsa-sha1` or `rsa-sha256`. If set, checks that the signature uses this signing method. |
 | `digest-method`  | optional. Either `sha1` or `sha256`. If set, checks that the signature uses this digest method. |
 | `public-key`     | optional. the PEM-encoded RSA public key. You can use a variable reference here as shown above. |
-| `key-identifier-type` | optional. Either `RSA_KEY_VALUE` or `X509_CERT_DIRECT`. Defaults to `RSA_KEY_VALUE`. If you specify  `X509_CERT_DIRECT`, the policy will extract the certificate from the signed document, and extract the public key from that certificate. You must set `certificate-thumbprint` in this case, to the SHA-1 thumbprint of the trusted certificate. By default, this policy checks the validity of the certificate - that "right now" is before the certificate notAfter date, and  after the notBefore date. |
-| `omit-certificate-validity-check` | optional. Specify `true` or `false`, defaults to `false`. If `true`, the policy will not perform a validity check on the certificate (a check of the notBefore and notAfter dates). This is not recommended! It means the policy might accept as valid, a certificate that is expired. |
+| `key-identifier-type` | optional. Either `RSA_KEY_VALUE` or `X509_CERT_DIRECT`. Defaults to `RSA_KEY_VALUE`. If you specify  `X509_CERT_DIRECT`, the policy will extract the certificate from the signed document, and extract the public key from that certificate. In this case, you must set `certificate-thumbprints` or `certificate-thumbprints-s256` to the set of SHA-1 of SHA-256 thumbprints of trusted certificates. |
+| `omit-certificate-validity-check` | optional. Specify `true` or `false`, defaults to `false`. By default, this policy checks the validity of the certificate - that "right now" is before the certificate notAfter date, and after the notBefore date.  If `true`, the policy will not perform a validity check on the certificate (a check of the notBefore and notAfter dates). This is not recommended! It means the policy might accept as valid, a certificate that is expired. |
 | `certificate-thumbprints` | optional. a comma-separated list of acceptable SHA-1 thumbprints of the certificates that are trusted. Don't use this setting, if possible. Instead use the S256 version. This property is used only when `key-identifier-type` is `X509_CERT_DIRECT`. |
 | `certificate-thumbprints-s256` | optional. a comma-separated list of acceptable SHA-256 thumbprints of the certificates that are trusted. This takes precedence over the deprecated `certificate-thumbprints`.  This property is used only when `key-identifier-type` is `X509_CERT_DIRECT`. |
 | `reform-signedinfo`      | optional. Specify `true` to tell the validating callout to reform the `SignedInfo` element to remove spaces and newlines, before validating the signature. Omit this if you'd like to avoid unnecessary busy work. |
@@ -206,7 +207,7 @@ See [the example API proxy included here](./bundle) for a working example of the
 
 ## Example API Proxy Bundle
 
-Deploy the API Proxy to an organization and environment using a tool like [importAndDeploy.js](https://github.com/DinoChiesa/apigee-edge-js/blob/master/examples/importAndDeploy.js)
+Deploy the API Proxy to an organization and environment using a tool like [apigeecli](https://github.com/apigee/apigeecli/blob/main/docs/apigeecli.md)
 
 There are some sample documents included in this repo that you can use for demonstrations.
 
@@ -234,6 +235,7 @@ Either form of PEM-encoded key works.
    ORG=myorgname
    ENV=myenv
    endpoint=https://${ORG}-${ENV}.apigee.net
+   
    # Apigee X or hybrid
    endpoint=https://my-apigee-hostname.example.org
 
@@ -413,8 +415,8 @@ the signedd XML. Be careful when doing so!
 * If you sign a sub-tree within a document, then modify the whitespace of the
   sub-tree that has been signed, then validating the signature will fail.
 
-* But, if you sign a sub-tree within a document, then modify the SignedInfo
-  element that denotes the thing that has been signed, for example, by inserting
+* If you sign a sub-tree within a document, then modify the SignedInfo
+  element, for example, by inserting
   newlines and indents to make it more legible, validating the signature will
   fail.
 

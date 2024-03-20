@@ -1,0 +1,63 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?><purchaseOrder xmlns='http://tempuri.org/po.xsd' orderDate='2017-05-20'>
+    <shipTo country='US'>
+        <name>Alice Smith</name>
+        <street>123 Maple Street</street>
+        <city>Mill Valley</city>
+        <state>CA</state>
+        <zip>90952</zip>
+    </shipTo>
+    <billTo country='US'>
+        <name>Robert Smith</name>
+        <street>8 Oak Avenue</street>
+        <city>Old Town</city>
+        <state>PA</state>
+        <zip>95819</zip>
+    </billTo>
+    <comment>Hurry, my lawn is going wild!</comment>
+    <items>
+        <item partNum='872-AA'>
+            <productName>Lawnmower</productName>
+            <quantity>1</quantity>
+            <USPrice>148.95</USPrice>
+            <comment>Confirm this is electric</comment>
+        </item>
+        <item partNum='926-AA'>
+            <productName>Baby Monitor</productName>
+            <quantity>1</quantity>
+            <USPrice>39.98</USPrice>
+            <shipDate>2018-05-21</shipDate>
+        </item>
+    </items>
+<Signature
+    xmlns='http://www.w3.org/2000/09/xmldsig#'>
+  <SignedInfo>
+    <CanonicalizationMethod
+Algorithm='http://www.w3.org/2001/10/xml-exc-c14n#'/>
+    <SignatureMethod
+Algorithm='http://www.w3.org/2001/04/xmldsig-more#rsa-sha256'/>
+    <Reference URI=''>
+      <Transforms>
+        <Transform Algorithm='http://www.w3.org/2000/09/xmldsig#enveloped-signature'/>
+      </Transforms>
+      <DigestMethod Algorithm='http://www.w3.org/2001/04/xmlenc#sha256'/>
+      <DigestValue>1wIK6YeSoMz7WH622eUOtLryj1G9ohm5Dd//Kg3WLak=</DigestValue>
+    </Reference>
+  </SignedInfo>
+  <SignatureValue>Tg06XoumiHfFvEcrweYbGSpAc7VhzYIXhUtDTPvykJ+AbAgTJkMS/eYaTmiOdYHQnTuQLnVV0Zcd
+  4U5u7nSTUNoKrFdo/gqD/elhWvqdUtWwVWffgyowQ7/KseIF5ua5nc7EnLTHGbhJPD4q3fs/T3cb
+  Z9YNYGRfYiaceFp/wPT8eRlvJfzm17CT7/bv7YTy4IJhJxCI9L6FGwbTlePzCQE3NbFLpCYYgLfj
+  6RvU0vmvXEvxR4T858V1Vb2dhbXdZA3qAhZfYbnCAuD+KWlezMKobXHlBR5Hs3yqmsCl9y4dMwck
+  L3ZMAzVche9ykXTirb3U8X9Fyp5OpJzCN2d0zw==</SignatureValue>
+  <KeyInfo>
+    <KeyValue>
+      <RSAKeyValue>
+        <Modulus>B6PenDyGOg0P5vb5DfJ13DmjJi82KdPT58LjZlG6LYD27IFCh1yO+4ygJAxfIB00muiIuB8YyQ3T
+        JKgkJdEWcVTGL1aomN0PuHTHP67FfBPHgmCM1+wEtm6tn+uoxyvQhLkB1/4Ke0VA7wJx4LB5Nxoo
+        /4GCYZp+m/1DAqTvDy99hRuSTWt+VJacgPvfDMA2akFJAwUVSJwh/SyFZf2yqonzfnkHEK/hnC81
+        vACs6usAj4wR04yj5yElXW+pQ5Vk4RUwR6Q0E8nKWLfYFrXygeYUbTSQEj0f44DGVHOdMdT+BoGV
+        5SJ1ITs+peOCYjhVZvdngyCP9YNDtsLZftMLoQ==</Modulus>
+        <Exponent>AQAB</Exponent>
+      </RSAKeyValue>
+    </KeyValue>
+  </KeyInfo>
+</Signature></purchaseOrder>

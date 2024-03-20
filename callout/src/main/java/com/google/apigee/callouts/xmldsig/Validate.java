@@ -1,4 +1,4 @@
-// Copyright 2018-2022 Google LLC
+// Copyright 2018-2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -99,12 +99,14 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
   }
 
   private static Element childByTagNameNS(
-      Element parent, String targetNodeName, String targetNodeNS) {
+      Element parent, String targetLocalName, String targetNodeNS) {
     for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
-      if (child instanceof Element
-          && targetNodeName.equals(child.getNodeName())
-          && targetNodeNS.equals(child.getNamespaceURI())) {
-        return (Element) child;
+      if (child instanceof Element) {
+        Element el = (Element) child;
+        if (targetLocalName.equals(el.getLocalName())
+            && targetNodeNS.equals(el.getNamespaceURI())) {
+          return (Element) child;
+        }
       }
     }
     return null;
@@ -119,7 +121,6 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
       //   throw new RuntimeException(String.format("Couldn't find '%s' element", parts[i]));
       // }
       // currentElement = (Element) nl.item(0);
-
       currentElement = childByTagNameNS(currentElement, parts[i], XMLSignature.XMLNS);
       if (currentElement == null) {
         throw new RuntimeException(String.format("Couldn't find '%s' element", parts[i]));
@@ -144,9 +145,20 @@ public class Validate extends XmlDsigCalloutBase implements Execution {
       throw new RuntimeException(
           "Invalid signature. There is no URI attribute on the Reference element.");
     }
-    if (!"".equals(referenceURI)) {
-      throw new RuntimeException(
-          "Invalid signature. The signature does not apply to the root element.");
+    if ("".equals(referenceURI)) {
+      // OK. The signature applies to root element, by convention.
+    } else {
+      String rootId = doc.getDocumentElement().getAttribute("ID");
+      if (rootId == null) {
+        throw new RuntimeException(
+            "Invalid signature. There is no ID attribute on the root element.");
+      }
+      if (!rootId.equals(referenceURI.substring(1))) {
+        throw new RuntimeException(
+            "Invalid signature. The signature does not apply to the root element.");
+      }
+      // mark as ID for future use
+      doc.getDocumentElement().setIdAttribute("ID", true);
     }
 
     if ((config.signingMethod != null) || (config.digestMethod != null)) {

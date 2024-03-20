@@ -5,5 +5,5 @@
     <Property name='certificate-thumbprints-s256'>0067b84f4d5f8425888cc28b99238a3c71b5c50274a22d336695f462ffe169ed</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Validate</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220920.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20240319.jar</ResourceURL>
 </JavaCallout>

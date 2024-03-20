@@ -42,7 +42,7 @@ public class TestBase {
   Message message;
   ExecutionContext exeCtxt;
 
-  Boolean verbose = false; // true
+  Boolean verbose = true; // false
 
   @BeforeMethod()
   public void beforeMethod() {
@@ -62,7 +62,8 @@ public class TestBase {
             }
             Object value = variables.get(name);
             if (verbose) {
-              System.out.printf("getVariable(%s) => %s\n", name, value==null?"-null-":value.toString());
+              System.out.printf(
+                  "getVariable(%s) => %s\n", name, value == null ? "-null-" : value.toString());
             }
             return value;
           }
@@ -73,7 +74,8 @@ public class TestBase {
               variables = new HashMap<String, Object>();
             }
             if (verbose) {
-              System.out.printf("setVariable(%s) => %s\n", name, value==null?"-null-":value.toString());
+              System.out.printf(
+                  "setVariable(%s) => %s\n", name, value == null ? "-null-" : value.toString());
             }
             variables.put(name, value);
             return true;
@@ -85,7 +87,7 @@ public class TestBase {
               variables = new HashMap<String, Object>();
             }
             if (verbose) {
-              System.out.printf("removeVariable(%s)\n", name );
+              System.out.printf("removeVariable(%s)\n", name);
             }
             if (variables.containsKey(name)) {
               variables.remove(name);
@@ -111,9 +113,10 @@ public class TestBase {
         }.getMockInstance();
   }
 
-  protected static String getResourceFileContents(String childDir, String filename) throws Exception {
+  protected static String getResourceFileContents(String childDir, String filename)
+      throws Exception {
     Path path = Paths.get(testResourceDir, childDir, filename);
-    if (! Files.exists(path)) {
+    if (!Files.exists(path)) {
       return null;
     }
     return new String(Files.readAllBytes(path));
@@ -127,9 +130,7 @@ public class TestBase {
   protected Object[][] toDataProvider(String[] a) {
     ArrayList<Object[]> list = new ArrayList<Object[]>();
 
-    IntStream.range(0, a.length)
-      .forEach( i -> list.add(new Object[] { i, a[i] }));
+    IntStream.range(0, a.length).forEach(i -> list.add(new Object[] {i, a[i]}));
     return list.toArray(new Object[list.size()][]);
   }
-
 }

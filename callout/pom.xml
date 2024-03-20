@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.google.apigee.edgecallouts</groupId>
   <artifactId>apigee-xmldsig</artifactId>
-  <version>20220920</version>
+  <version>20240319</version>
   <name>ApigeeJavaXmlDsig</name>
   <url>http://maven.apache.org</url>
   <packaging>jar</packaging>

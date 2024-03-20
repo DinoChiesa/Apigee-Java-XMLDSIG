@@ -8,5 +8,5 @@
     <Property name='issuer-name-style'>common_name</Property>
   </Properties>
   <ClassName>com.google.apigee.callouts.xmldsig.Sign</ClassName>
-  <ResourceURL>java://apigee-xmldsig-20220920.jar</ResourceURL>
+  <ResourceURL>java://apigee-xmldsig-20240319.jar</ResourceURL>
 </JavaCallout>
